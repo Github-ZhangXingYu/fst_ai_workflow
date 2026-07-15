@@ -1,0 +1,13 @@
+# FST AI测试工作流 — 忽略运行时状态和报告
+state/
+reports/reports/*.html
+reports/audit/*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/

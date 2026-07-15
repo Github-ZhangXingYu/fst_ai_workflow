@@ -1,0 +1,89 @@
+{#- 集成测试模板 (Google Test + Google Mock) -#}
+{#
+  变量:
+    function_name:    被测函数名
+    suite_name:       测试套件名
+    module_path:      模块头文件路径
+    mock_classes:     [{class_name, methods: [{name, return_type, params}]}]
+    test_cases:       [{name, scenario, expected, mock_setup, arrange, act, assert}]
+#}
+// ============================================================================
+// 测试目标: {{ function_name }}
+// 测试类型: 集成测试（含 Mock 对象）
+// 生成时间: {{ generation_time }}
+// 覆盖场景: {% for tc in test_cases %}{{ tc.scenario }}{% if not loop.last %}, {% endif %}{% endfor %}
+// ============================================================================
+
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
+{% for inc in includes %}
+#include "{{ inc }}"
+{% endfor %}
+
+using ::testing::_;
+using ::testing::Return;
+using ::testing::DoAll;
+using ::testing::SetArgReferee;
+using ::testing::Invoke;
+using ::testing::NiceMock;
+using ::testing::StrictMock;
+using ::testing::AtLeast;
+using ::testing::Exactly;
+using ::testing::Times;
+
+// ============================================================================
+// Mock 类定义
+// ============================================================================
+{% for mock in mock_classes %}
+class Mock{{ mock.class_name }} : public {{ mock.class_name }} {
+public:
+{% for method in mock.methods %}
+    MOCK_METHOD{{ method.param_count | default(0) }}({{ method.name }},
+                     {{ method.return_type }}({{ method.params | default('') }})
+                     {% if method.const %}(const){% endif %}
+                     {% if method.override %}(override){% endif %});
+{% endfor %}
+};
+{% endfor %}
+
+// ============================================================================
+// 测试夹具
+// ============================================================================
+class {{ suite_name }} : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // 创建 Mock 对象
+        {% for mock in mock_classes %}
+        mock_{{ mock.class_name | lower }}_ = std::make_shared<Mock{{ mock.class_name }}>();
+        {% endfor %}
+    }
+
+    void TearDown() override {
+        // Mock 对象自动析构
+    }
+
+    // Mock 对象成员
+    {% for mock in mock_classes %}
+    std::shared_ptr<Mock{{ mock.class_name }}> mock_{{ mock.class_name | lower }}_;
+    {% endfor %}
+};
+
+{% for tc in test_cases %}
+// --------------------------------------------------------------------------
+// 测试场景: {{ tc.scenario }}
+// 预期行为: {{ tc.expected }}
+// --------------------------------------------------------------------------
+TEST_F({{ suite_name }}, {{ tc.name }}) {
+    // Arrange — 设置 Mock 期望
+    {{ tc.mock_setup | default('// TODO: 设置 Mock 期望') }}
+
+    // Arrange — 准备测试数据
+    {{ tc.arrange | default('// TODO: 准备测试数据') }}
+
+    // Act — 执行被测函数
+    {{ tc.act | default('// TODO: 调用被测函数') }}
+
+    // Assert — 验证结果和 Mock 调用
+    {{ tc.assert | default('// TODO: 验证结果') }}
+}
+{% endfor %}

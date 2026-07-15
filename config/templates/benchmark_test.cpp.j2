@@ -1,0 +1,58 @@
+{#- 性能测试模板 (Google Benchmark) -#}
+{#
+  变量:
+    module_name:      模块名
+    benchmarks:       [{name, target_function, description, setup_code, run_code, data_sizes: [N]}]
+#}
+// ============================================================================
+// 性能测试目标: {{ module_name }} 模块
+// 测试类型: 性能基准测试 (Google Benchmark)
+// 生成时间: {{ generation_time }}
+// 基准测试项: {% for bm in benchmarks %}{{ bm.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+// ============================================================================
+
+#include <benchmark/benchmark.h>
+{% for inc in includes %}
+#include "{{ inc }}"
+{% endfor %}
+
+using namespace benchmark;
+
+{% for bm in benchmarks %}
+// --------------------------------------------------------------------------
+// {{ bm.description | default(bm.name) }}
+// --------------------------------------------------------------------------
+static void BM_{{ bm.name }}(benchmark::State& state) {
+    // 准备测试数据
+    {{ bm.setup_code | default('// TODO: 准备基准测试数据') }}
+
+    // 预热（不计时）
+    {{ bm.warmup_code | default('// TODO: 预热调用') }}
+
+    for (auto _ : state) {
+        // 被基准测试的代码（计时循环）
+        {{ bm.run_code | default('// TODO: 调用被测函数') }}
+    }
+
+    // 设置处理量指标
+    {% if bm.items_processed %}
+    state.SetItemsProcessed(state.iterations() * {{ bm.items_processed }});
+    {% endif %}
+    {% if bm.bytes_processed %}
+    state.SetBytesProcessed(state.iterations() * {{ bm.bytes_processed }});
+    {% endif %}
+}
+// 注册基准测试
+{% if bm.data_sizes %}
+{% for size in bm.data_sizes %}
+BENCHMARK(BM_{{ bm.name }})->Arg({{ size }});
+{% endfor %}
+{% else %}
+BENCHMARK(BM_{{ bm.name }});
+{% endif %}
+
+{% endfor %}
+// ============================================================================
+// 主函数（仅在直接运行 benchmark 时使用）
+// ============================================================================
+BENCHMARK_MAIN();

@@ -1,0 +1,53 @@
+{#- 单元测试模板 (Google Test) -#}
+{#
+  变量:
+    function_name:    被测函数名
+    suite_name:       测试套件名
+    module_path:      模块头文件路径
+    test_cases:       [{name, scenario, expected, setup_code, test_code, assertions}]
+#}
+// ============================================================================
+// 测试目标: {{ function_name }}
+// 测试类型: 单元测试
+// 生成时间: {{ generation_time }}
+// 覆盖场景: {% for tc in test_cases %}{{ tc.scenario }}{% if not loop.last %}, {% endif %}{% endfor %}
+// ============================================================================
+
+#include <gtest/gtest.h>
+{% for inc in includes %}
+#include "{{ inc }}"
+{% endfor %}
+
+// ============================================================================
+// 测试夹具（如需要）
+// ============================================================================
+class {{ suite_name }} : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // TODO: 初始化测试环境
+        {{ setup_code | default('// 无需特殊初始化') }}
+    }
+
+    void TearDown() override {
+        // TODO: 清理测试环境
+    }
+
+    // TODO: 声明测试成员变量
+};
+
+{% for tc in test_cases %}
+// --------------------------------------------------------------------------
+// 测试场景: {{ tc.scenario }}
+// 预期行为: {{ tc.expected }}
+// --------------------------------------------------------------------------
+TEST_F({{ suite_name }}, {{ tc.name }}) {
+    // Arrange（准备测试数据）
+    {{ tc.arrange_code | default('// TODO: 准备测试数据') }}
+
+    // Act（执行被测函数）
+    {{ tc.act_code | default('// TODO: 调用被测函数') }}
+
+    // Assert（验证结果）
+    {{ tc.assert_code | default('// TODO: 验证结果') }}
+}
+{% endfor %}

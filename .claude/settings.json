@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "condition": "tool_input.file_path matches \"\\\\.(cpp|h|hpp|cc|cxx|hxx)$\" and tool_input.file_path contains \"service/\"",
+        "command": "mkdir -p \"$CLAUDE_PROJECT_DIR/state\" && echo \"AUTO_TRIGGER\" > \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" && echo \"$TOOL_INPUT_FILE_PATH\" >> \"$CLAUDE_PROJECT_DIR/state/trigger.flag\"",
+        "description": "检测到C++文件变更，记录触发标志"
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "PostToolUse",
+        "condition": "file_exists('state/trigger.flag')",
+        "message": "🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。",
+        "autoSend": true
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "command": "rm -f \"$CLAUDE_PROJECT_DIR/state/trigger.flag\"",
+        "description": "会话结束时清理触发标志"
+      }
+    ]
+  }
+}

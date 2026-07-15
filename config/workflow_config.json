@@ -1,0 +1,91 @@
+{
+  "_comment": "FST AI测试工作流配置文件 — 所有阈值、路径、循环限制",
+
+  "thresholds": {
+    "statement_coverage": 90,
+    "branch_coverage": 80,
+    "min_test_per_function": 1,
+    "min_test_types": ["unit"]
+  },
+
+  "limits": {
+    "compile_fix_max_iterations": 3,
+    "coverage_supplement_max_iterations": 2,
+    "compile_timeout_seconds": 300,
+    "test_timeout_seconds": 300,
+    "benchmark_timeout_seconds": 600,
+    "codegraph_timeout_seconds": 30,
+    "max_impact_functions_per_batch": 10,
+    "max_total_impact_functions": 50
+  },
+
+  "paths": {
+    "service_dir": "service",
+    "test_dir": "test",
+    "build_dir": "build/test",
+    "state_dir": "state",
+    "report_dir": "reports/reports",
+    "audit_dir": "reports/audit",
+    "config_dir": "config",
+    "template_dir": "config/templates"
+  },
+
+  "triggers": {
+    "auto_trigger_enabled": true,
+    "watch_extensions": [".cpp", ".h", ".hpp", ".cc", ".cxx", ".hxx"],
+    "watch_paths": ["service/"]
+  },
+
+  "deepseek_optimization": {
+    "max_context_functions": 5,
+    "max_context_lines": 500,
+    "structured_prompts": true,
+    "validate_output_before_apply": true,
+    "single_function_per_call": true,
+    "prefer_small_batches": true
+  },
+
+  "coverage": {
+    "enabled": true,
+    "tool": "lcov",
+    "fallback": "gcovr",
+    "exclude_patterns": [
+      "/usr/include/*",
+      "/usr/local/include/*",
+      "*/googletest/*",
+      "*/gtest/*",
+      "*/gmock/*",
+      "*/test/*",
+      "*/tests/*",
+      "*/build/*",
+      "*/third_party/*",
+      "*/3rdparty/*",
+      "*/external/*"
+    ]
+  },
+
+  "audit": {
+    "enabled": true,
+    "format": "jsonl",
+    "rotate_daily": true,
+    "retention_days": 90,
+    "integrity_check": true
+  },
+
+  "report": {
+    "language": "zh-CN",
+    "format": "html",
+    "include_screenshots": false,
+    "chapters": [
+      "summary",
+      "impact",
+      "assessment",
+      "test_results",
+      "coverage",
+      "traceability",
+      "compile_fixes",
+      "audit",
+      "gaps"
+    ]
+  }
+}
