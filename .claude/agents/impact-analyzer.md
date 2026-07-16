@@ -50,7 +50,10 @@ grep -rn "#include" service/<module>/ | grep -v "/test/"
 }
 ```
 
-## 约束
-- 不要无限扩展影响范围（最多追踪 2 层调用链）
-- 如果影响超过 20 个函数，通知orchestrator 分批处理
-- 标注分析方法的来源（codegraph / grep / manual）
+## 约束（硬性）
+
+1. **最多追踪 2 层调用链**：直接调用者 + 间接调用者即可，不无限递归
+2. **影响 > 20 个函数 → 通知编排器**：分批处理，每批 ≤10 个
+3. **标注分析方法来源**：codegraph / grep / manual，每个调用关系标注 confidence
+4. **must_test 判定要具体**：标注为什么需要测试（依赖返回值、参数类型、行为变化等）
+5. **CodeGraph 不可用时用 grep 降级**：不伪造数据，标注 confidence=low
