@@ -7,14 +7,7 @@
           {
             "type": "command",
             "command": "echo \"$CLAUDE_PROJECT_DIR/$TOOL_INPUT_FILE_PATH\" | grep -qE '\\.(cpp|h|hpp|cc|cxx|hxx)$' && echo \"$TOOL_INPUT_FILE_PATH\" | grep -q 'service/' && mkdir -p \"$CLAUDE_PROJECT_DIR/state\" && echo \"AUTO_TRIGGER\" > \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" && echo \"$TOOL_INPUT_FILE_PATH\" >> \"$CLAUDE_PROJECT_DIR/state/trigger.flag\""
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "PostToolUse",
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "if [ -f \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" ]; then echo '{\"systemMessage\": \"🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。\"}'; fi"
@@ -24,7 +17,7 @@
     ],
     "Stop": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
