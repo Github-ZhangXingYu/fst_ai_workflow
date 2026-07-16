@@ -27,8 +27,6 @@ fst/                              # 项目根目录（也是 git 仓库根目录
 ├── ai_workflow/                  # AI测试工作流
 │   ├── scripts/                  # Python 确定性操作脚本
 │   ├── config/                   # 配置和模板
-│   │   ├── workflow_config.json
-│   │   └── templates/            # C++ 测试模板
 │   ├── state/                    # 工作流运行时状态
 │   └── reports/                  # 输出报告和审计日志
 ├── service/                      # 微服务模块源码
