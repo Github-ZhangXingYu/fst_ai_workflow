@@ -16,9 +16,8 @@
         "matcher": "PostToolUse",
         "hooks": [
           {
-            "type": "notification",
-            "matcher": "file_exists('state/trigger.flag')",
-            "message": "🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。"
+            "type": "command",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" ]; then echo '{\"systemMessage\": \"🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。\"}'; fi"
           }
         ]
       }
