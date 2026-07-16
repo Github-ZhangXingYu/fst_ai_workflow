@@ -861,7 +861,7 @@ def main():
 
     if args.output is None:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        args.output = f'ai_workflow/reports/reports/test_report_{timestamp}.html'
+        args.output = f'ai_workflow/reports/test_report_{timestamp}.html'
 
     report_path = generate_report(args.state_dir, args.output)
     print(f'报告已生成: {report_path}')

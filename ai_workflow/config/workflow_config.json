@@ -24,7 +24,7 @@
     "test_dir": "test",
     "build_dir": "build/test",
     "state_dir": "ai_workflow/state",
-    "report_dir": "ai_workflow/reports/reports",
+    "report_dir": "ai_workflow/reports",
     "config_dir": "ai_workflow/config",
     "template_dir": "ai_workflow/config/templates"
   },

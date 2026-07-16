@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"$CLAUDE_PROJECT_DIR/$TOOL_INPUT_FILE_PATH\" | grep -qE '\\.(cpp|h|hpp|cc|cxx|hxx)$' && echo \"$TOOL_INPUT_FILE_PATH\" | grep -q 'service/' && mkdir -p \"$CLAUDE_PROJECT_DIR/state\" && echo \"AUTO_TRIGGER\" > \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" && echo \"$TOOL_INPUT_FILE_PATH\" >> \"$CLAUDE_PROJECT_DIR/state/trigger.flag\""
+            "command": "echo \"$CLAUDE_PROJECT_DIR/$TOOL_INPUT_FILE_PATH\" | grep -qE '\\.(cpp|h|hpp|cc|cxx|hxx)$' && echo \"$TOOL_INPUT_FILE_PATH\" | grep -q 'service/' && mkdir -p \"$CLAUDE_PROJECT_DIR/ai_workflow/state\" && echo \"AUTO_TRIGGER\" > \"$CLAUDE_PROJECT_DIR/ai_workflow/state/trigger.flag\" && echo \"$TOOL_INPUT_FILE_PATH\" >> \"$CLAUDE_PROJECT_DIR/ai_workflow/state/trigger.flag\""
           },
           {
             "type": "command",
-            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/state/trigger.flag\" ]; then echo '{\"systemMessage\": \"🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。\"}'; fi"
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR/ai_workflow/state/trigger.flag\" ]; then echo '{\"systemMessage\": \"🔍 检测到 C++ 代码变更 (service/)。建议运行 /test-analyze 进行测试影响分析。\"}'; fi"
           }
         ]
       }
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rm -f \"$CLAUDE_PROJECT_DIR/state/trigger.flag\""
+            "command": "rm -f \"$CLAUDE_PROJECT_DIR/ai_workflow/state/trigger.flag\""
           }
         ]
       }

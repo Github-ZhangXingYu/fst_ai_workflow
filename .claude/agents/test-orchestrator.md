@@ -261,7 +261,7 @@ while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
 ### 步骤 9: 生成报告
 
 ```bash
-python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/reports/test_report_$(date +%Y%m%d_%H%M%S).html
+python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/test_report_$(date +%Y%m%d_%H%M%S).html
 python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 ```
 
