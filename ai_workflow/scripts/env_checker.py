@@ -160,7 +160,7 @@ def check_googletest() -> dict:
     ]
 
     # 也检查 CMake FetchContent 的下载位置
-    build_dirs = ['build', 'build/test', 'cmake-build-debug']
+    build_dirs = ['build', 'cmake-build-debug']
     for bd in build_dirs:
         if os.path.exists(bd):
             for root, dirs, files in os.walk(bd):
@@ -188,7 +188,7 @@ def check_compile_commands() -> dict:
     """检查 compile_commands.json 是否存在（clang-tidy 和 CodeGraph 需要）。"""
     locations = [
         'build/compile_commands.json',
-        'build/test/compile_commands.json',
+        'build/compile_commands.json',
         'compile_commands.json',
     ]
     found = None
@@ -214,15 +214,15 @@ def check_project_structure() -> dict:
 
     if not os.path.exists('service'):
         issues.append('缺少 service/ 目录（微服务源码目录）')
-    if not os.path.exists('test'):
-        issues.append('缺少 test/ 目录（测试代码目录）')
+    if not os.path.exists('tests'):
+        issues.append('缺少 tests/ 目录（测试代码目录）')
 
     return {
         'name': '项目目录结构',
         'available': len(issues) == 0,
         'version': '',
         'ok': len(issues) == 0,
-        'required': 'service/ 和 test/ 目录',
+        'required': 'service/ 和 tests/ 目录',
         'message': '; '.join(issues) if issues else '目录结构正确',
     }
 

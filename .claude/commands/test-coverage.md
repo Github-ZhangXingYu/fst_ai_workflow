@@ -23,14 +23,16 @@ python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_
 如果 `can_start` = false，立即停止。
 
 ### 2. Coverage 模式编译
+
+先读 CMakeLists.txt 确认测试 target 名和 cmake 选项，然后：
 ```bash
-python ai_workflow/scripts/build_runner.py --build-dir build/test --target $ARGUMENTS\_tests --coverage --output ai_workflow/state/compile_coverage_result.json
+python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --coverage --output ai_workflow/state/compile_coverage_result.json
 ```
 编译失败 → 修复 → 重编译。最多 2 次。
 
 ### 3. 运行测试 + 采集覆盖率
 ```bash
-python ai_workflow/scripts/coverage.py --binary build/test/$ARGUMENTS\_tests --source service/$ARGUMENTS/ --output ai_workflow/state/coverage_report.json --summary
+python ai_workflow/scripts/coverage.py --binary product/bin/unittest/{测试二进制名} --source service/$ARGUMENTS/ --build-dir build --output ai_workflow/state/coverage_report.json --summary
 ```
 
 向用户展示：

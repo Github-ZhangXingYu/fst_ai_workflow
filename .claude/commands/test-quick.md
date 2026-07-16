@@ -32,20 +32,29 @@ python ai_workflow/scripts/change_detector.py {--auto | --module $ARGUMENTS} --o
 如果 `total_files` = 0，报告"未检测到变更"并结束。
 
 ### 3. 编译测试
+
+FST 编译惯例：`mkdir -p build && cd build && cmake .. <options> && make -j8 <target>`
+测试二进制输出到 `product/bin/unittest/` 下。
+
+先读 CMakeLists.txt 找到正确的 cmake 选项和测试 target 名，然后：
+
 ```bash
-python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output ai_workflow/state/compile_result.json
+# --build-dir 是 build/，--cmake-options 传递 CMakeLists.txt 中的自定义选项
+python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --output ai_workflow/state/compile_result.json
 ```
-如果编译失败：分析错误 → 修复（仅改测试代码，不改 service/ 代码）→ 重编译。最多 3 次。
+
+如果编译失败：分析错误 → 修复 → 重编译。最多 3 次。
 
 ### 4. 运行测试
 ```bash
-python ai_workflow/scripts/test_runner.py --binary build/test/{模块名}_tests --output ai_workflow/state/test_results.json
+# 测试二进制在 product/bin/unittest/ 下
+python ai_workflow/scripts/test_runner.py --binary product/bin/unittest/{测试二进制名} --output ai_workflow/state/test_results.json
 ```
 
 ### 5. 覆盖率分析
 ```bash
-python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output ai_workflow/state/compile_coverage_result.json
-python ai_workflow/scripts/coverage.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage_report.json
+python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --coverage --output ai_workflow/state/compile_coverage_result.json
+python ai_workflow/scripts/coverage.py --binary product/bin/unittest/{测试二进制名} --source service/{模块名}/ --build-dir build --output ai_workflow/state/coverage_report.json
 ```
 
 ### 6. 展示结果摘要

@@ -92,7 +92,7 @@ def classify_file(filepath: str) -> dict:
 
     从路径中提取模块名：
     - service/<module>/... → module=<module>, type=service
-    - test/<module>/...   → module=<module>, type=test
+    - tests/<module>/...   → module=<module>, type=test
 
     Args:
         filepath: 文件路径
@@ -109,7 +109,7 @@ def classify_file(filepath: str) -> dict:
             module = parts[i + 1]
             file_type = 'service'
             break
-        elif part == 'test' and i + 1 < len(parts):
+        elif part in ('test', 'tests') and i + 1 < len(parts):
             module = parts[i + 1]
             file_type = 'test'
             break

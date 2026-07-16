@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-测试扫描器：扫描test/目录，解析Google Test宏，建立函数到测试的映射表。
+测试扫描器：扫描tests/目录，解析Google Test宏，建立函数到测试的映射表。
 用于Stage 3：已有测试评估。
 """
 import os
@@ -39,14 +39,14 @@ TARGET_FUNCTION_REGEX = re.compile(r'^(\w+?)_')
 def scan_test_directory(test_root: str) -> dict:
     """扫描所有测试文件，将测试映射到目标函数。
 
-    遍历test/下所有.cpp文件，解析：
+    遍历tests/下所有.cpp文件，解析：
     - Google Test宏（TEST/TEST_F/TEST_P等）
     - Google Benchmark宏
     - Mock方法声明
     建立 函数名 → [测试信息列表] 的映射。
 
     Args:
-        test_root: test/目录的根路径
+        test_root: tests/目录的根路径
 
     Returns:
         {
@@ -277,7 +277,7 @@ def main():
                         help='影响集JSON文件路径（impact_set.json）')
     parser.add_argument('--output', required=True,
                         help='评估结果输出路径')
-    parser.add_argument('--test-dir', default='test',
+    parser.add_argument('--test-dir', default='tests',
                         help='测试目录根路径')
     parser.add_argument('--source-dir', default='service',
                         help='源码目录根路径')

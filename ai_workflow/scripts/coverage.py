@@ -299,14 +299,14 @@ def format_summary(report: dict) -> str:
 
 def coverage_analyze(test_binary: str, source_dir: str,
                       output_path: str = 'ai_workflow/state/coverage_report.json',
-                      build_dir: str = 'build/test') -> dict:
+                      build_dir: str = 'build') -> dict:
     """一步完成覆盖率采集和解析。
 
     Args:
-        test_binary: 测试二进制文件路径
+        test_binary: 测试二进制文件路径（如 product/bin/unittest/xxx_tests）
         source_dir: 被测源码目录
         output_path: 最终 JSON 报告输出路径
-        build_dir: CMake 构建目录
+        build_dir: CMake 构建目录（用于 lcov --directory）
 
     Returns:
         完整的覆盖率报告 dict（同原 coverage_parser 输出）
@@ -363,8 +363,8 @@ def main():
                         help='被测源码目录')
     parser.add_argument('--output', default='ai_workflow/state/coverage_report.json',
                         help='最终 JSON 报告输出路径')
-    parser.add_argument('--build-dir', default='build/test',
-                        help='CMake 构建目录')
+    parser.add_argument('--build-dir', default='build',
+                        help='CMake 构建目录（用于 lcov 采集，默认 build/）')
     parser.add_argument('--check-tools', action='store_true',
                         help='检查覆盖率工具可用性')
     parser.add_argument('--summary', action='store_true',

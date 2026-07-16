@@ -97,7 +97,7 @@ python ai_workflow/scripts/workflow_state.py --transition-to IMPACT_ANALYZE
 ### 步骤 3: 已有测试评估
 
 ```bash
-python ai_workflow/scripts/test_scanner.py --impact-set ai_workflow/state/impact_set.json --output ai_workflow/state/test_assessment.json --test-dir test
+python ai_workflow/scripts/test_scanner.py --impact-set ai_workflow/state/impact_set.json --output ai_workflow/state/test_assessment.json --test-dir tests
 ```
 
 对 `verdict` 为 `adapt` 或 `new` 的函数，使用 **test-evaluator Agent**：
@@ -157,6 +157,12 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
 
 ### 步骤 5: 编译修复循环（最多 3 次）
 
+**FST 编译惯例**：
+```
+mkdir -p build && cd build && cmake .. <options> && make -j8 <target>
+```
+测试可执行文件编译后位于 `product/bin/unittest/` 或其他 `product/bin/` 子目录下。
+
 **编译错误修复按优先级排序（先修根因）：**
 
 | 优先级 | 类别 | 识别特征 | 策略 |
@@ -172,7 +178,10 @@ while iteration < 3:
     iteration += 1
     python ai_workflow/scripts/workflow_state.py --increment-compile-fix
 
-    python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output ai_workflow/state/compile_result.json
+    # 1. 先看 CMakeLists.txt，确定正确的 cmake 选项和 target 名
+    # 2. cd build && cmake .. <options> && make -j8 <target>
+    python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --output ai_workflow/state/compile_result.json
+    # 如果 CMakeLists.txt 有自定义 cmake 选项（如 -DBUILD_TESTING=ON），用 --cmake-options 传进去
 
     if 编译成功: break
     else:
@@ -197,7 +206,15 @@ python ai_workflow/scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
 ### 步骤 6: 测试执行
 
 ```bash
-python ai_workflow/scripts/test_runner.py --binary build/test/{模块名}_tests --output ai_workflow/state/test_results.json
+# FST 测试二进制位于 product/bin/unittest/ 下
+# 先用 --find-binaries 找到实际的测试文件路径
+python ai_workflow/scripts/test_runner.py --find-binaries --build-dir product/bin/unittest
+# 然后对每个测试二进制运行：
+python ai_workflow/scripts/test_runner.py --binary product/bin/unittest/{测试二进制名} --output ai_workflow/state/test_results.json
+```
+**注意**：不同的 CMake target 可能把测试二进制放到 `product/bin/unittest/`、`product/bin/test/` 等不同子目录。用 `--find-binaries` 先搜一下，或读 CMakeLists.txt 确认输出路径。
+
+```bash
 python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 ```
 
@@ -210,10 +227,10 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 ### 步骤 7: 覆盖率分析
 
 ```bash
-# Coverage 模式重编译
-python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output ai_workflow/state/compile_coverage_result.json
-# 采集 + 解析覆盖率（一步完成）
-python ai_workflow/scripts/coverage.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage_report.json
+# 1. 用 cmake + make 重编译（开启覆盖率）
+python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --coverage --output ai_workflow/state/compile_coverage_result.json
+# 2. 采集 + 解析覆盖率（一步完成）
+python ai_workflow/scripts/coverage.py --binary product/bin/unittest/{测试二进制名} --source service/{模块名}/ --build-dir build --output ai_workflow/state/coverage_report.json
 ```
 
 **阈值检查：** 语句覆盖 ≥ 90% → `line_threshold_met`；分支覆盖 ≥ 80% → `branch_threshold_met`。

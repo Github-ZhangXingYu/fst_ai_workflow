@@ -352,8 +352,8 @@ def main():
                         help='随机化测试顺序')
     parser.add_argument('--find-binaries', action='store_true',
                         help='在构建目录中查找所有测试二进制')
-    parser.add_argument('--build-dir', default='build/test',
-                        help='构建目录路径（用于--find-binaries）')
+    parser.add_argument('--build-dir', default='product/bin/unittest',
+                        help='查找测试二进制的目录（默认 product/bin/unittest）')
 
     args = parser.parse_args()
 

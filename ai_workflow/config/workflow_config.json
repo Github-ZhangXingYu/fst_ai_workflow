@@ -21,8 +21,10 @@
 
   "paths": {
     "service_dir": "service",
-    "test_dir": "test",
-    "build_dir": "build/test",
+    "test_dir": "tests",
+    "build_dir": "build",
+    "product_dir": "product",
+    "test_binary_dir": "product/bin/unittest",
     "state_dir": "ai_workflow/state",
     "report_dir": "ai_workflow/reports",
     "config_dir": "ai_workflow/config",

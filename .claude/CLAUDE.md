@@ -31,7 +31,7 @@ fst/                              # 项目根目录（也是 git 仓库根目录
 │   └── reports/                  # 输出报告（HTML报告等）
 ├── service/                      # 微服务模块源码
 │   └── <module>/
-└── test/                         # 测试代码
+└── tests/                        # 测试代码
     └── <module>/
         ├── unit/
         ├── integration/
@@ -52,10 +52,10 @@ fst/                              # 项目根目录（也是 git 仓库根目录
 
 | 类型 | 目录 | 框架 | 说明 |
 |-----|------|------|------|
-| 单元测试 | `test/<模块>/unit/` | Google Test | 测试单个函数/类的独立行为 |
-| 集成测试 | `test/<模块>/integration/` | Google Test + Mock | 测试组件间协作，Mock 外部依赖 |
-| 性能测试 | `test/<模块>/performance/` | Google Benchmark | 测试关键路径的性能指标 |
-| 测试工具 | `test/<模块>/tools/` | - | 测试辅助代码、Mock 实现 |
+| 单元测试 | `tests/<模块>/unit/` | Google Test | 测试单个函数/类的独立行为 |
+| 集成测试 | `tests/<模块>/integration/` | Google Test + Mock | 测试组件间协作，Mock 外部依赖 |
+| 性能测试 | `tests/<模块>/performance/` | Google Benchmark | 测试关键路径的性能指标 |
+| 测试工具 | `tests/<模块>/tools/` | - | 测试辅助代码、Mock 实现 |
 
 ## AI 测试工作流规则
 
@@ -94,6 +94,6 @@ INIT → CHANGE_DETECT → IMPACT_ANALYZE → TEST_ASSESS → TEST_GENERATE
 | 变量 | 说明 | 默认值 |
 |-----|------|--------|
 | `CODEGRAPH_CMD` | CodeGraph CLI 命令 | `codegraph` |
-| `FST_BUILD_DIR` | CMake 构建目录 | `build/test` |
+| `FST_BUILD_DIR` | CMake 构建目录 | `build` |
 | `FST_SERVICE_DIR` | 服务源码目录 | `service` |
-| `FST_TEST_DIR` | 测试目录 | `test` |
+| `FST_TEST_DIR` | 测试目录 | `tests` |

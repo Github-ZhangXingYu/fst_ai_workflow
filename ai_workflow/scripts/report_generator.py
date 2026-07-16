@@ -708,8 +708,8 @@ def _build_coverage_section(data: dict) -> str:
             short_path = fp
             if '/service/' in fp:
                 short_path = fp.split('/service/', 1)[-1]
-            elif '/test/' in fp:
-                short_path = fp.split('/test/', 1)[-1]
+            elif '/tests/' in fp:
+                short_path = fp.split('/tests/', 1)[-1]
             rows += f'''<tr>
                 <td style="font-size:0.83em;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                     title="{fp}">{short_path}</td>

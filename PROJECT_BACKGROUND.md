@@ -81,7 +81,7 @@
 ## 内网部署步骤
 
 1. 将本仓库代码通过 JumpServer 传到内网 Linux
-2. 放到 fst 项目根目录下（与 `service/`、`test/` 同级）
+2. 放到 fst 项目根目录下（与 `service/`、`tests/` 同级）
 3. 确保环境就绪：`python scripts/env_checker.py`
 4. 如缺少工具，根据提示从外网下载 → JumpServer → 内网安装
 5. 运行 `python scripts/env_checker.py --json` 确认全部通过
