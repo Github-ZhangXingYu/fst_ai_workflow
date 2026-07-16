@@ -68,7 +68,15 @@ TEST(TransactionProcessorTest, processRefund_ValidOrder_ReturnsSuccess) {
 }
 ```
 
-## 约束
-- 一次只为一个函数生成测试
-- 只生成确实需要的测试类型
-- 如果不确定某个细节，读取现有代码来确认
+## 约束（硬性，不可违反）
+
+1. **一个 Agent = 一个函数**：每次只为一个函数生成测试，禁止在一个 Agent 中处理多个函数
+2. **只生成需要的测试类型**：只做提示中要求的测试类型（unit/integration/performance），不擅自加码
+3. **不确定就查**：如果不确定 include 路径、namespace、接口签名，必须 Read 源码确认
+4. **生成完即止**：生成测试代码后直接返回结果给编排器。不要尝试编译或运行（编排器负责）
+5. **文件放置正确**：
+   - 单元测试 → `test/<模块>/unit/test_<函数名>.cpp`
+   - 集成测试 → `test/<模块>/integration/test_<函数名>_integ.cpp`
+   - 性能测试 → `test/<模块>/performance/bench_<函数名>.cpp`
+6. **每个测试文件必须有文件头注释**：说明测试目标、覆盖范围、生成时间
+7. **检查已有测试**：写测试前先用 Glob 检查是否已有同名测试文件，避免覆盖
