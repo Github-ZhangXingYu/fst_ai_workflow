@@ -393,7 +393,7 @@ def _load_state_data(state_dir: str) -> dict:
                     pass
 
     # 审计日志
-    audit_path = Path('reports/audit/audit_log.jsonl')
+    audit_path = Path('ai_workflow/reports/audit/audit_log.jsonl')
     if audit_path.exists():
         with open(audit_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -932,7 +932,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='FST报告生成器：生成中文HTML测试报告'
     )
-    parser.add_argument('--state-dir', default='state',
+    parser.add_argument('--state-dir', default='ai_workflow/state',
                         help='工作流状态目录（默认state/）')
     parser.add_argument('--output', default=None,
                         help='HTML报告输出路径（默认自动生成带时间戳的文件名）')
@@ -941,7 +941,7 @@ def main():
 
     if args.output is None:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        args.output = f'reports/reports/test_report_{timestamp}.html'
+        args.output = f'ai_workflow/reports/reports/test_report_{timestamp}.html'
 
     report_path = generate_report(args.state_dir, args.output)
     print(f'报告已生成: {report_path}')

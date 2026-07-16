@@ -23,11 +23,11 @@
     "service_dir": "service",
     "test_dir": "test",
     "build_dir": "build/test",
-    "state_dir": "state",
-    "report_dir": "reports/reports",
-    "audit_dir": "reports/audit",
-    "config_dir": "config",
-    "template_dir": "config/templates"
+    "state_dir": "ai_workflow/state",
+    "report_dir": "ai_workflow/reports/reports",
+    "audit_dir": "ai_workflow/reports/audit",
+    "config_dir": "ai_workflow/config",
+    "template_dir": "ai_workflow/config/templates"
   },
 
   "triggers": {

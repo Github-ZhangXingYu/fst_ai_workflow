@@ -238,7 +238,7 @@ def check_scripts() -> dict:
 
     missing = []
     for s in required_scripts:
-        path = os.path.join('scripts', s)
+        path = os.path.join('ai_workflow/scripts', s)
         if not os.path.exists(path):
             missing.append(s)
 

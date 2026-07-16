@@ -18,7 +18,7 @@ argument: 模块名（必填，如 payment）
 
 ### 1. 环境检查
 ```bash
-python scripts/env_checker.py --json --output state/env_check.json
+python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_check.json
 ```
 如果 `can_start` = false，立即停止。
 

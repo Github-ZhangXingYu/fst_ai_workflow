@@ -21,7 +21,7 @@ import threading
 
 
 # 默认审计日志目录和文件
-DEFAULT_AUDIT_DIR = 'reports/audit'
+DEFAULT_AUDIT_DIR = 'ai_workflow/reports/audit'
 AUDIT_LOG_FILE = 'audit_log.jsonl'
 
 

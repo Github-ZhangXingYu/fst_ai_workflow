@@ -40,14 +40,14 @@ class WorkflowState:
     - 提供循环继续判断
 
     用法:
-        state = WorkflowState('state/')
+        state = WorkflowState('ai_workflow/state/')
         state.init('manual', 'zhangsan')
         state.transition('CHANGE_DETECT')
         if state.can_continue_compile_fix():
             state.increment_compile_fix()
     """
 
-    def __init__(self, state_dir: str = 'state'):
+    def __init__(self, state_dir: str = 'ai_workflow/state'):
         self.state_dir = Path(state_dir)
         self.state_file = self.state_dir / 'workflow_state.json'
         os.makedirs(self.state_dir, exist_ok=True)
@@ -368,7 +368,7 @@ def main():
                         help='获取当前状态')
     parser.add_argument('--timeline', action='store_true',
                         help='显示阶段时间线')
-    parser.add_argument('--state-dir', default='state',
+    parser.add_argument('--state-dir', default='ai_workflow/state',
                         help='状态目录（默认state/）')
 
     args = parser.parse_args()

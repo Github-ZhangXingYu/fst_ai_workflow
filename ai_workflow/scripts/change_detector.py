@@ -211,7 +211,7 @@ def main():
                         help='指定的文件路径列表')
     parser.add_argument('--module',
                         help='检测指定模块的变更')
-    parser.add_argument('--output', default='state/changed_files.json',
+    parser.add_argument('--output', default='ai_workflow/state/changed_files.json',
                         help='输出JSON路径')
     parser.add_argument('--service-dir', default='service',
                         help='服务目录路径')
