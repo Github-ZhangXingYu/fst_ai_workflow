@@ -24,18 +24,18 @@ python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_
 
 ### 2. Coverage 模式编译
 ```bash
-python scripts/build_runner.py --build-dir build/test --target $ARGUMENTS\_tests --coverage --output state/compile_coverage_result.json
+python ai_workflow/scripts/build_runner.py --build-dir build/test --target $ARGUMENTS\_tests --coverage --output ai_workflow/state/compile_coverage_result.json
 ```
 编译失败 → 修复 → 重编译。最多 2 次。
 
 ### 3. 运行测试 + 采集覆盖率
 ```bash
-python scripts/coverage_runner.py --binary build/test/$ARGUMENTS\_tests --source service/$ARGUMENTS/ --output state/coverage/
+python ai_workflow/scripts/coverage_runner.py --binary build/test/$ARGUMENTS\_tests --source service/$ARGUMENTS/ --output ai_workflow/state/coverage/
 ```
 
 ### 4. 解析并展示
 ```bash
-python scripts/coverage_parser.py --input state/coverage/ --output state/coverage_report.json --summary
+python ai_workflow/scripts/coverage_parser.py --input ai_workflow/state/coverage/ --output ai_workflow/state/coverage_report.json --summary
 ```
 
 向用户展示：

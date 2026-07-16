@@ -247,7 +247,7 @@ def check_scripts() -> dict:
         'available': len(missing) == 0,
         'version': '',
         'ok': len(missing) == 0,
-        'required': 'scripts/ 下全部 10 个脚本',
+        'required': 'ai_workflow/scripts/ 下全部 11 个脚本',
         'message': f'缺少脚本: {", ".join(missing)}' if missing else '全部脚本就绪',
     }
 

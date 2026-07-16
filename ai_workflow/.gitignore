@@ -1,7 +1,0 @@
-# FST AI测试工作流
-state/
-reports/reports/*.html
-reports/audit/*.jsonl
-__pycache__/
-*.pyc
-*.pyo

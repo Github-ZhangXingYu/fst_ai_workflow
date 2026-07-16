@@ -25,7 +25,7 @@ Agent({
   subagent_type: "test-orchestrator",
   description: "执行 FST 测试分析工作流",
   prompt: "用户参数: $ARGUMENTS。
-触发方式: {如果 state/trigger.flag 存在则为 auto，否则为 manual}。
+触发方式: {如果 ai_workflow/state/trigger.flag 存在则为 auto，否则为 manual}。
 请严格按照 10 步工作流执行，每步完成后校验数据并向主对话报告进度。
 遇到无法自动解决的问题时暂停，等待用户决策。"
 })

@@ -32,10 +32,10 @@ model: inherit
 执行环境预检：
 
 ```bash
-python scripts/env_checker.py --json --output state/env_check.json
+python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_check.json
 ```
 
-读取 `state/env_check.json`，检查 `can_start` 字段：
+读取 `ai_workflow/state/env_check.json`，检查 `can_start` 字段：
 
 | 情况 | 响应 |
 |------|------|
@@ -47,12 +47,12 @@ python scripts/env_checker.py --json --output state/env_check.json
 初始化工作流：
 
 ```bash
-python scripts/workflow_state.py --init --trigger {manual|auto} --user "$USER"
-python scripts/audit_logger.py --event workflow_start --details "{触发方式, 参数}" --user "$USER" --stage INIT
-python scripts/workflow_state.py --transition-to CHANGE_DETECT
+python ai_workflow/scripts/workflow_state.py --init --trigger {manual|auto} --user "$USER"
+python ai_workflow/scripts/audit_logger.py --event workflow_start --details "{触发方式, 参数}" --user "$USER" --stage INIT
+python ai_workflow/scripts/workflow_state.py --transition-to CHANGE_DETECT
 ```
 
-**校验：** env_check.json 存在且 can_start = true？state/workflow_state.json 存在？
+**校验：** env_check.json 存在且 can_start = true？ai_workflow/state/workflow_state.json 存在？
 
 ---
 
@@ -60,10 +60,10 @@ python scripts/workflow_state.py --transition-to CHANGE_DETECT
 
 ```bash
 # 有指定模块 → 按模块检测；否则自动检测
-python scripts/change_detector.py {--module <模块名> | --auto} --output state/changed_files.json
+python ai_workflow/scripts/change_detector.py {--module <模块名> | --auto} --output ai_workflow/state/changed_files.json
 ```
 
-读取 `state/changed_files.json`：
+读取 `ai_workflow/state/changed_files.json`：
 
 | 情况 | 响应 |
 |------|------|
@@ -71,7 +71,7 @@ python scripts/change_detector.py {--module <模块名> | --auto} --output state
 | `total_files` > 0 | 展示变更摘要（哪些文件、哪些函数），继续 |
 
 ```bash
-python scripts/audit_logger.py --event change_detected --input state/changed_files.json
+python ai_workflow/scripts/audit_logger.py --event change_detected --input ai_workflow/state/changed_files.json
 ```
 
 **校验：** total_files > 0？每个 changed_file 有 path/module/file_type 字段？
@@ -83,16 +83,16 @@ python scripts/audit_logger.py --event change_detected --input state/changed_fil
 对每个模块的每个变更函数执行：
 
 ```bash
-python scripts/codegraph_analyzer.py --function "{函数名}" --module "{模块名}" --output state/impact_{模块名}_{函数名}.json
+python ai_workflow/scripts/codegraph_analyzer.py --function "{函数名}" --module "{模块名}" --output ai_workflow/state/impact_{模块名}_{函数名}.json
 ```
 
 **函数名含 `::` 时需要转义处理。**
 
-汇总所有影响分析结果：direct_changes ∪ callers ∪ callees → 去重 → `state/impact_set.json`。
+汇总所有影响分析结果：direct_changes ∪ callers ∪ callees → 去重 → `ai_workflow/state/impact_set.json`。
 
 ```bash
-python scripts/audit_logger.py --event impact_analysis --input state/impact_set.json
-python scripts/workflow_state.py --transition-to IMPACT_ANALYZE
+python ai_workflow/scripts/audit_logger.py --event impact_analysis --input ai_workflow/state/impact_set.json
+python ai_workflow/scripts/workflow_state.py --transition-to IMPACT_ANALYZE
 ```
 
 **校验：** full_impact_set 非空？analysis_method 字段是否存在（如需，告知主对话降级情况）？
@@ -103,7 +103,7 @@ python scripts/workflow_state.py --transition-to IMPACT_ANALYZE
 ### 步骤 3: 已有测试评估
 
 ```bash
-python scripts/test_scanner.py --impact-set state/impact_set.json --output state/test_assessment.json --test-dir test
+python ai_workflow/scripts/test_scanner.py --impact-set ai_workflow/state/impact_set.json --output ai_workflow/state/test_assessment.json --test-dir test
 ```
 
 对 `verdict` 为 `adapt` 或 `new` 的函数，使用 **test-evaluator Agent**：
@@ -119,7 +119,7 @@ Agent({
 **Agent 调用规则：** adapt/new < 3 → 可自己分析；≥ 3 → 必须用 Agent。
 
 ```bash
-python scripts/workflow_state.py --transition-to TEST_ASSESS
+python ai_workflow/scripts/workflow_state.py --transition-to TEST_ASSESS
 ```
 
 向主对话报告评估摘要（reuse/adapt/new 各多少）。
@@ -143,7 +143,7 @@ Agent({
 需要的测试类型: {needed_test_types}
 函数源码: service/{模块名}/{文件}
 
-要求: 1) 阅读源码 2) 识别全部分支 3) 生成 GTest/GMock/GBenchmark 代码 4) 遵循命名规范和目录结构 5) 参考 config/templates/ 模板。"
+要求: 1) 阅读源码 2) 识别全部分支 3) 生成 GTest/GMock/GBenchmark 代码 4) 遵循命名规范和目录结构 5) 参考 ai_workflow/config/templates/ 模板。"
 })
 ```
 
@@ -154,7 +154,7 @@ Agent({
 - ✅ 函数数 > 10 → 先询问主对话确认
 
 ```bash
-python scripts/workflow_state.py --transition-to TEST_GENERATE
+python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
 ```
 
 **校验：** 生成的测试文件确实写入了磁盘（ls 检查）？每个文件至少包含 #include <gtest/gtest.h>？
@@ -176,9 +176,9 @@ python scripts/workflow_state.py --transition-to TEST_GENERATE
 iteration = 0
 while iteration < 3:
     iteration += 1
-    python scripts/workflow_state.py --increment-compile-fix
+    python ai_workflow/scripts/workflow_state.py --increment-compile-fix
 
-    python scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output state/compile_result.json
+    python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output ai_workflow/state/compile_result.json
 
     if 编译成功: 记录审计，break
     else:
@@ -195,7 +195,7 @@ while iteration < 3:
         向主对话报告"编译修复已用满3次，需要人工介入"
         展示最后编译错误，询问是否继续
 
-python scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
+python ai_workflow/scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
 ```
 
 ---
@@ -203,9 +203,9 @@ python scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
 ### 步骤 6: 测试执行
 
 ```bash
-python scripts/test_runner.py --binary build/test/{模块名}_tests --output state/test_results.json
-python scripts/audit_logger.py --event test_execution --input state/test_results.json --stage TEST_EXECUTE
-python scripts/workflow_state.py --transition-to TEST_EXECUTE
+python ai_workflow/scripts/test_runner.py --binary build/test/{模块名}_tests --output ai_workflow/state/test_results.json
+python ai_workflow/scripts/audit_logger.py --event test_execution --input ai_workflow/state/test_results.json --stage TEST_EXECUTE
+python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 ```
 
 向主对话报告：通过/失败/跳过数。
@@ -218,11 +218,11 @@ python scripts/workflow_state.py --transition-to TEST_EXECUTE
 
 ```bash
 # Coverage 模式重编译
-python scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output state/compile_coverage_result.json
+python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output ai_workflow/state/compile_coverage_result.json
 # 采集覆盖率
-python scripts/coverage_runner.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output state/coverage/
+python ai_workflow/scripts/coverage_runner.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage/
 # 解析
-python scripts/coverage_parser.py --input state/coverage/ --output state/coverage_report.json
+python ai_workflow/scripts/coverage_parser.py --input ai_workflow/state/coverage/ --output ai_workflow/state/coverage_report.json
 ```
 
 **阈值检查：** 语句覆盖 ≥ 90% → `line_threshold_met`；分支覆盖 ≥ 80% → `branch_threshold_met`。
@@ -231,8 +231,8 @@ python scripts/coverage_parser.py --input state/coverage/ --output state/coverag
 - 未达标 → 继续步骤 8
 
 ```bash
-python scripts/audit_logger.py --event coverage_analysis --input state/coverage_report.json --stage COVERAGE_ANALYZE
-python scripts/workflow_state.py --transition-to COVERAGE_ANALYZE
+python ai_workflow/scripts/audit_logger.py --event coverage_analysis --input ai_workflow/state/coverage_report.json --stage COVERAGE_ANALYZE
+python ai_workflow/scripts/workflow_state.py --transition-to COVERAGE_ANALYZE
 ```
 
 **校验：** line_coverage_pct 和 branch_coverage_pct 都有值？
@@ -247,7 +247,7 @@ before_line = 从 coverage_report.json 读取
 
 while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
     iteration += 1
-    python scripts/workflow_state.py --increment-coverage-supplement
+    python ai_workflow/scripts/workflow_state.py --increment-coverage-supplement
 
     # 读取 gaps，按 priority 排：先处理 high
     # 对于 top-3 gap，使用 coverage-supplementer Agent：
@@ -262,7 +262,7 @@ while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
     if 覆盖率完全没有变化:
         向主对话报告"补充测试未提升覆盖率"，停止循环
 
-    python scripts/audit_logger.py --event coverage_supplement --details "iteration=$iteration, before=$before, after=$after"
+    python ai_workflow/scripts/audit_logger.py --event coverage_supplement --details "iteration=$iteration, before=$before, after=$after"
 
     if iteration == 2 and 仍未达标:
         向主对话报告"覆盖率补充已用满2次，记录警告"
@@ -273,8 +273,8 @@ while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
 ### 步骤 9: 生成报告
 
 ```bash
-python scripts/report_generator.py --state-dir state/ --output reports/reports/test_report_$(date +%Y%m%d_%H%M%S).html
-python scripts/workflow_state.py --transition-to REPORT
+python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/reports/test_report_$(date +%Y%m%d_%H%M%S).html
+python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 ```
 
 向主对话展示报告路径和关键摘要（覆盖率、通过率、影响函数数）。
@@ -284,9 +284,9 @@ python scripts/workflow_state.py --transition-to REPORT
 ### 步骤 10: 完成
 
 ```bash
-rm -f state/trigger.flag
-python scripts/audit_logger.py --event workflow_end --details '{"success": true}' --stage DONE
-python scripts/workflow_state.py --complete --success --summary "工作流完成"
+rm -f ai_workflow/state/trigger.flag
+python ai_workflow/scripts/audit_logger.py --event workflow_end --details '{"success": true}' --stage DONE
+python ai_workflow/scripts/workflow_state.py --complete --success --summary "工作流完成"
 ```
 
 向主对话展示最终摘要。

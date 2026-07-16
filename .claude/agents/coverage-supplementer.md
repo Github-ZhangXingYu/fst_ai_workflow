@@ -9,7 +9,7 @@ tools: Read, Write, Edit, Grep
 
 ## 工作流程
 
-1. 读取 `state/coverage_report.json`
+1. 读取 `ai_workflow/state/coverage_report.json`
 2. 找出优先级最高的覆盖率缺口（gaps 列表中排在前面的）
 3. 对每个缺口：
    a. 读取未覆盖文件的相关源码

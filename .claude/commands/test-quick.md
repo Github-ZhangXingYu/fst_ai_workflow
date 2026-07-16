@@ -21,32 +21,32 @@ argument: 模块名（如 payment）。不指定则自动检测变更模块
 
 ### 1. 环境检查
 ```bash
-python scripts/env_checker.py --json --output state/env_check.json
+python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_check.json
 ```
 如果 `can_start` = false，立即停止并报告缺失项。
 
 ### 2. 变更检测
 ```bash
-python scripts/change_detector.py {--auto | --module $ARGUMENTS} --output state/changed_files.json
+python ai_workflow/scripts/change_detector.py {--auto | --module $ARGUMENTS} --output ai_workflow/state/changed_files.json
 ```
 如果 `total_files` = 0，报告"未检测到变更"并结束。
 
 ### 3. 编译测试
 ```bash
-python scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output state/compile_result.json
+python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --output ai_workflow/state/compile_result.json
 ```
 如果编译失败：分析错误 → 修复（仅改测试代码，不改 service/ 代码）→ 重编译。最多 3 次。
 
 ### 4. 运行测试
 ```bash
-python scripts/test_runner.py --binary build/test/{模块名}_tests --output state/test_results.json
+python ai_workflow/scripts/test_runner.py --binary build/test/{模块名}_tests --output ai_workflow/state/test_results.json
 ```
 
 ### 5. 覆盖率分析
 ```bash
-python scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output state/compile_coverage_result.json
-python scripts/coverage_runner.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output state/coverage/
-python scripts/coverage_parser.py --input state/coverage/ --output state/coverage_report.json
+python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output ai_workflow/state/compile_coverage_result.json
+python ai_workflow/scripts/coverage_runner.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage/
+python ai_workflow/scripts/coverage_parser.py --input ai_workflow/state/coverage/ --output ai_workflow/state/coverage_report.json
 ```
 
 ### 6. 展示结果摘要

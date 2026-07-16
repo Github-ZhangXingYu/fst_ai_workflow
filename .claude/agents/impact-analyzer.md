@@ -13,7 +13,7 @@ tools: Bash, Read, Grep, Glob
    a. 运行 `codegraph_analyzer.py` 查询 callers 和 callees
    b. 解读结果，判断哪些调用者确实会被影响
    c. 构建影响传播关系
-3. 汇总所有结果写入 `state/impact_set.json`
+3. 汇总所有结果写入 `ai_workflow/state/impact_set.json`
 
 ## CodeGraph 不可用时的降级策略
 
