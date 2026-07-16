@@ -171,27 +171,6 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
         .badge-caller { background: var(--warn-color); }
         .badge-callee { background: var(--primary); }
 
-        /* 审计日志区 */
-        .audit-log {
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: "Consolas", "Courier New", monospace;
-            font-size: 0.88em;
-            background: #1e2a36;
-            color: #cfd8dc;
-            padding: 16px;
-            border-radius: 8px;
-            line-height: 1.7;
-        }
-        .audit-entry {
-            padding: 4px 0;
-            border-left: 3px solid #3498db;
-            padding-left: 12px;
-            margin: 4px 0;
-        }
-        .audit-entry.error { border-left-color: var(--fail-color); color: #f5b7b1; }
-        .audit-entry.success { border-left-color: var(--pass-color); }
-
         /* 底部 */
         .footer {
             text-align: center;
@@ -294,12 +273,8 @@ HTML_TEMPLATE = '''<!DOCTYPE html>
     <h2>7. 🔧 编译修复记录</h2>
     {{compile_fix_section}}
 
-    <!-- 8. 审计追踪 -->
-    <h2>8. 📝 审计追踪</h2>
-    {{audit_section}}
-
-    <!-- 9. 未达标项 -->
-    <h2>9. ⚠️ 未达标项与建议</h2>
+    <!-- 8. 未达标项 -->
+    <h2>8. ⚠️ 未达标项与建议</h2>
     {{gaps_section}}
 
     <div class="footer">
@@ -334,7 +309,6 @@ def _load_state_data(state_dir: str) -> dict:
         'coverage_report': {},
         'compile_fixes': [],
         'coverage_supplements': [],
-        'audit_entries': [],
         'workflow_state': {},
     }
 
@@ -391,31 +365,6 @@ def _load_state_data(state_dir: str) -> dict:
                         data['compile_fixes'].append(json.load(fh))
                 except Exception:
                     pass
-
-    # 审计日志
-    audit_path = Path('ai_workflow/reports/audit/audit_log.jsonl')
-    if audit_path.exists():
-        with open(audit_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        data['audit_entries'].append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-
-    # 编译修复记录也可以从审计日志中提取
-    if not data['compile_fixes']:
-        data['compile_fixes'] = [
-            e for e in data['audit_entries']
-            if e.get('event') == 'compile_fix'
-        ]
-
-    # 覆盖率补充记录
-    data['coverage_supplements'] = [
-        e for e in data['audit_entries']
-        if e.get('event') == 'coverage_supplement'
-    ]
 
     return data
 
@@ -509,7 +458,6 @@ def generate_report(state_dir: str, output_path: str) -> str:
     html = html.replace('{{coverage_section}}', _build_coverage_section(data))
     html = html.replace('{{traceability_section}}', _build_traceability_section(data))
     html = html.replace('{{compile_fix_section}}', _build_compile_fix_section(data))
-    html = html.replace('{{audit_section}}', _build_audit_section(data))
     html = html.replace('{{gaps_section}}', _build_gaps_section(data))
 
     # 写入文件
@@ -837,34 +785,6 @@ def _build_compile_fix_section(data: dict) -> str:
                      f'</div>')
 
     return html or '<p>无编译修复记录。</p>'
-
-
-def _build_audit_section(data: dict) -> str:
-    """构建审计追踪章节。"""
-    entries = data.get('audit_entries', [])
-
-    if not entries:
-        return '<p>无审计记录。</p>'
-
-    html = '<div class="audit-log">'
-    for entry in entries[-50:]:  # 最近50条
-        ts = entry.get('timestamp', '')[:19]  # 截断到秒
-        event = entry.get('event', '?')
-        user = entry.get('user', '?')
-        stage = entry.get('stage', '')
-        css_class = 'error' if event == 'error' else ''
-        if event in ('workflow_end', 'compile_fix'):
-            css_class = 'success'
-        html += (f'<div class="audit-entry {css_class}">'
-                 f'[{ts}] [{user}] <strong>{event}</strong>'
-                 f'{(" @ " + stage) if stage else ""}'
-                 f'</div>')
-    html += '</div>'
-
-    if len(entries) > 50:
-        html += f'<p style="margin-top:8px;color:#999">... 共 {len(entries)} 条记录，显示最近 50 条</p>'
-
-    return html
 
 
 def _build_gaps_section(data: dict) -> str:

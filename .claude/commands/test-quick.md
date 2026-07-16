@@ -45,8 +45,7 @@ python ai_workflow/scripts/test_runner.py --binary build/test/{模块名}_tests 
 ### 5. 覆盖率分析
 ```bash
 python ai_workflow/scripts/build_runner.py --build-dir build/test --target {模块名}_tests --coverage --output ai_workflow/state/compile_coverage_result.json
-python ai_workflow/scripts/coverage_runner.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage/
-python ai_workflow/scripts/coverage_parser.py --input ai_workflow/state/coverage/ --output ai_workflow/state/coverage_report.json
+python ai_workflow/scripts/coverage.py --binary build/test/{模块名}_tests --source service/{模块名}/ --output ai_workflow/state/coverage_report.json
 ```
 
 ### 6. 展示结果摘要

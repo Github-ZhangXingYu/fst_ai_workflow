@@ -30,12 +30,7 @@ python ai_workflow/scripts/build_runner.py --build-dir build/test --target $ARGU
 
 ### 3. 运行测试 + 采集覆盖率
 ```bash
-python ai_workflow/scripts/coverage_runner.py --binary build/test/$ARGUMENTS\_tests --source service/$ARGUMENTS/ --output ai_workflow/state/coverage/
-```
-
-### 4. 解析并展示
-```bash
-python ai_workflow/scripts/coverage_parser.py --input ai_workflow/state/coverage/ --output ai_workflow/state/coverage_report.json --summary
+python ai_workflow/scripts/coverage.py --binary build/test/$ARGUMENTS\_tests --source service/$ARGUMENTS/ --output ai_workflow/state/coverage_report.json --summary
 ```
 
 向用户展示：

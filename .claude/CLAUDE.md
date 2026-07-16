@@ -28,7 +28,7 @@ fst/                              # 项目根目录（也是 git 仓库根目录
 │   ├── scripts/                  # Python 确定性操作脚本
 │   ├── config/                   # 配置和模板
 │   ├── state/                    # 工作流运行时状态
-│   └── reports/                  # 输出报告和审计日志
+│   └── reports/                  # 输出报告（HTML报告等）
 ├── service/                      # 微服务模块源码
 │   └── <module>/
 └── test/                         # 测试代码
@@ -73,10 +73,6 @@ INIT → CHANGE_DETECT → IMPACT_ANALYZE → TEST_ASSESS → TEST_GENERATE
 ### 循环控制
 - **编译修复循环**: 最多 3 次迭代。第 3 次仍失败则暂停并报告用户
 - **覆盖率补充循环**: 最多 2 次迭代。未达标则记录警告并继续
-
-### 审计要求
-- 所有工作流事件通过 `ai_workflow/scripts/audit_logger.py` 记录到 `ai_workflow/reports/audit/audit_log.jsonl`
-- 每个事件包含: timestamp, user, event, stage, details, result
 
 ## 质量规则
 
