@@ -192,6 +192,8 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
 
 ### 步骤 5: 编译修复循环（最多 3 次）
 
+> `compile_fix_iterations` 同时跟踪编译错误修复和测试逻辑修复，合计 ≤3 次。两种修复共享同一计数器。
+
 **FST 编译惯例**：
 ```
 mkdir -p build && cd build && cmake .. <options> && make -j8 <target>
@@ -256,6 +258,63 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 向主对话报告：通过/失败/跳过数。
 
 **校验：** passed+failed+skipped = total？
+
+---
+
+### 步骤 6.5: 测试失败分析
+
+读取 `ai_workflow/state/test_results.json`：
+
+| 情况 | 处理 |
+|------|------|
+| `failed` == 0 | 跳过此步骤，直接进入步骤 7 |
+
+如果存在失败用例：
+
+1. **对每个失败用例**，调用 test-failure-analyzer Agent：
+   ```
+   Agent({
+     subagent_type: "test-failure-analyzer",
+     description: "分析失败: {test_case_name}",
+     prompt: "分析测试失败根因。
+   测试用例: {test_case_name}
+   失败消息: {failure_message}
+   测试文件: tests/{模块}/{test_file}
+   被测模块: service/{模块名}/
+
+   要求: 1) 读测试源码 2) 读被测 service 源码 3) 判断根因是 test_bug 还是 service_bug 4) 输出结构化分析。"
+   })
+   ```
+   汇总结果，分类为 `test_bugs` 和 `service_bugs`。
+   **优化**：如果某失败用例在上轮已被分析为 service_bug 且 failure_message 未变化，直接复用上次结论，不重复调 Agent。
+
+2. **处理 test_bugs**：
+   ```
+   如果 test_bugs 非空:
+     用 compile-fixer Agent 修复测试代码（每次只修一个失败用例对应的测试）
+     修复后 → python ai_workflow/scripts/workflow_state.py --increment-compile-fix
+     回到步骤 5（复用编译修复循环，编译修复+测试修复合计 ≤3 次）
+     用完 3 次仍失败 → 暂停，报告用户
+   ```
+
+3. **处理 service_bugs**：
+   ```
+   如果 service_bugs 非空:
+     汇总所有 service_bug 分析结果
+     生成 ai_workflow/reports/service_bug_report.md:
+       - 元信息（工作流ID、时间、模块）
+       - 每个缺陷: 严重级别、源码位置、失败现象、根因分析、修复建议、CodeGraph影响范围
+     SendMessage 向主对话报告:
+       "发现 {N} 个 service 代码缺陷，已生成报告: ai_workflow/reports/service_bug_report.md
+        另一个编码工作流窗口可读取该报告进行修复，完成后重新触发本测试工作流。"
+     继续步骤 7（覆盖率分析，在最终报告中引用此报告）
+   ```
+
+```bash
+python ai_workflow/scripts/workflow_state.py --transition-to TEST_FAILURE_ANALYZE
+```
+
+**校验：** 每个失败用例都有分析结论？如有 service_bug，service_bug_report.md 是否生成？
 
 ---
 
@@ -325,10 +384,16 @@ python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 
 ```bash
 rm -f ai_workflow/state/trigger.flag
-python ai_workflow/scripts/workflow_state.py --complete --success --summary "工作流完成"
+if [ -f ai_workflow/reports/service_bug_report.md ]; then
+  python ai_workflow/scripts/workflow_state.py --complete --success \
+    --summary "工作流完成，发现 service 代码缺陷，详见 service_bug_report.md"
+else
+  python ai_workflow/scripts/workflow_state.py --complete --success \
+    --summary "工作流完成"
+fi
 ```
 
-向主对话展示最终摘要。
+向主对话展示最终摘要，如有 service_bug_report.md 一并说明。
 
 ---
 

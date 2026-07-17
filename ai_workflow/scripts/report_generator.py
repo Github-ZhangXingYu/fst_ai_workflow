@@ -326,6 +326,10 @@ def generate_report(state_dir: str, output_path: str) -> str:
         items.append(f'- ❌ **分支覆盖率未达标**: {bc}% (要求 ≥80%)')
     if data['tests_failed'] > 0:
         items.append(f'- ❌ **{data["tests_failed"]} 个测试失败**，需要人工检查')
+    # 检查是否有 service bug 报告
+    service_bug_path = Path(state_dir).parent / 'reports' / 'service_bug_report.md'
+    if service_bug_path.exists():
+        items.append(f'- 🔴 **Service 代码缺陷**: 详见 [service_bug_report.md](service_bug_report.md)')
     for g in data.get('coverage_gaps', [])[:10]:
         icon = '🔴' if g.get('priority') == 'high' else '🟡'
         items.append(f'- {icon} **{g["type"]}**: `{g["file"]}` '
