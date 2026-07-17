@@ -291,8 +291,8 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 2. **处理 test_bugs**：
    ```
    如果 test_bugs 非空:
-     用 compile-fixer Agent 修复测试代码（每次只修一个失败用例对应的测试）
-     修复后 → python ai_workflow/scripts/workflow_state.py --increment-compile-fix
+     test-failure-analyzer Agent 已在分析时直接修复了测试文件
+     → python ai_workflow/scripts/workflow_state.py --increment-compile-fix
      回到步骤 5（复用编译修复循环，编译修复+测试修复合计 ≤3 次）
      用完 3 次仍失败 → 暂停，报告用户
    ```
