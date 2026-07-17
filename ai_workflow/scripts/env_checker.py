@@ -151,36 +151,43 @@ def check_python_version() -> dict:
 
 
 def check_googletest() -> dict:
-    """检查是否可以找到 Google Test 头文件。"""
-    # 常见位置
+    """检查 Google Test 头文件是否在系统标准位置。"""
     search_paths = [
         '/usr/include/gtest/gtest.h',
         '/usr/local/include/gtest/gtest.h',
         '/usr/include/gtest.h',
     ]
-
-    # 也检查 CMake FetchContent 的下载位置
-    build_dirs = ['build', 'cmake-build-debug']
-    for bd in build_dirs:
-        if os.path.exists(bd):
-            for root, dirs, files in os.walk(bd):
-                if 'gtest.h' in files and 'gtest' in root:
-                    search_paths.append(os.path.join(root, 'gtest.h'))
-
     found = None
     for p in search_paths:
         if os.path.exists(p):
             found = p
             break
-
     return {
-        'name': 'Google Test',
         'available': found is not None,
         'version': f'位于 {found}' if found else '',
         'ok': found is not None,
-        'required': 'header file (gtest/gtest.h)',
-        'message': '' if found else ('未找到 Google Test 头文件。'
-                                    '请确保 CMake 已通过 FetchContent 下载，或手动安装。'),
+        'purpose': 'C++ 单元测试框架',
+        'fix_hint': 'sudo dnf install -y gtest-devel  (CentOS/RHEL)  |  sudo apt-get install -y libgtest-dev  (Ubuntu/Debian)',
+    }
+
+
+def check_googlemock() -> dict:
+    """检查 Google Mock 头文件是否在系统标准位置。"""
+    search_paths = [
+        '/usr/include/gmock/gmock.h',
+        '/usr/local/include/gmock/gmock.h',
+    ]
+    found = None
+    for p in search_paths:
+        if os.path.exists(p):
+            found = p
+            break
+    return {
+        'available': found is not None,
+        'version': f'位于 {found}' if found else '',
+        'ok': found is not None,
+        'purpose': 'C++ Mock 框架（集成测试必需）',
+        'fix_hint': 'sudo dnf install -y gmock-devel  (CentOS/RHEL)  |  sudo apt-get install -y libgmock-dev  (Ubuntu/Debian)',
     }
 
 
@@ -324,14 +331,17 @@ def run_all_checks() -> dict:
             'fix_hint': config['fix_hint'],
         }
 
-    # 4. 额外检查
+    # 4. 必须库（头文件检查，不在 PATH 中但有同等地位）
+    results['required']['googletest'] = check_googletest()
+    results['required']['googlemock'] = check_googlemock()
+
+    # 5. 额外检查
     results['extra_checks']['python_version'] = check_python_version()
-    results['extra_checks']['googletest'] = check_googletest()
     results['extra_checks']['compile_commands'] = check_compile_commands()
     results['extra_checks']['project_structure'] = check_project_structure()
     results['extra_checks']['scripts'] = check_scripts()
 
-    # 5. 汇总判断
+    # 6. 汇总判断
     all_required_ok = all(v['ok'] for v in results['required'].values())
     all_extra_ok = all(v['ok'] for v in results['extra_checks'].values())
     all_recommended_ok = all(v['ok'] for v in results['recommended'].values())
@@ -339,7 +349,7 @@ def run_all_checks() -> dict:
     results['passed'] = all_required_ok and all_extra_ok
     results['can_start'] = all_required_ok and all_extra_ok
 
-    # 6. 生成摘要
+    # 7. 生成摘要
     required_failed = [k for k, v in results['required'].items() if not v['ok']]
     recommended_failed = [k for k, v in results['recommended'].items() if not v['ok']]
     extra_failed = [k for k, v in results['extra_checks'].items() if not v['ok']]
