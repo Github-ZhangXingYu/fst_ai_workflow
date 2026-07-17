@@ -210,10 +210,14 @@ mkdir -p build && cd build && cmake .. <options> && make -j8 <target>
 | 4 | link_error | "undefined reference", "ld returned" | 检查 CMakeLists.txt 的 target_link_libraries |
 
 ```
-iteration = 0
-while iteration < 3:
-    iteration += 1
+# 从全局状态读取剩余修复次数（编译+测试修复共享，合计 ≤3）
+python ai_workflow/scripts/workflow_state.py --check-compile-fix
+# 返回 {"remaining": N, "current": M, "max": 3}
+
+while remaining > 0:
+    # 每次循环消耗 1 次修复机会
     python ai_workflow/scripts/workflow_state.py --increment-compile-fix
+    remaining -= 1
 
     # 1. 先看 CMakeLists.txt，确定正确的 cmake 选项和 target 名
     # 2. cd build && cmake .. <options> && make -j8 <target>
@@ -226,13 +230,13 @@ while iteration < 3:
         使用 compile-fixer Agent 修复：
         Agent({
           subagent_type: "compile-fixer",
-          description: "修复编译错误 batch {iteration}",
+          description: "修复编译错误 (剩余 {remaining} 次)",
           prompt: "修复以下编译错误（优先级: {P1_desc}）:\n{errors}\n源文件: {test_files}"
         })
         立即重编译
 
-    if iteration == 3 and 仍失败:
-        向主对话报告"编译修复已用满3次，需要人工介入"
+    if remaining == 0 and 仍失败:
+        向主对话报告"编译/测试修复已用满 3 次，需要人工介入"
         展示最后编译错误，询问是否继续
 
 python ai_workflow/scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
@@ -292,9 +296,8 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
    ```
    如果 test_bugs 非空:
      test-failure-analyzer Agent 已在分析时直接修复了测试文件
-     → python ai_workflow/scripts/workflow_state.py --increment-compile-fix
-     回到步骤 5（复用编译修复循环，编译修复+测试修复合计 ≤3 次）
-     用完 3 次仍失败 → 暂停，报告用户
+     → 回到步骤 5（步骤 5 统一消耗修复次数，编译+测试修复合计 ≤3 次）
+     如果步骤 5 返回"剩余次数为 0" → 暂停，报告用户
    ```
 
 3. **处理 service_bugs**：
