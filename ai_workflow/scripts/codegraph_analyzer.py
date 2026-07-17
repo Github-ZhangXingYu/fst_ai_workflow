@@ -50,10 +50,13 @@ def query_callers(function_name: str, search_path: str) -> list:
     Returns:
         [{name, file, line}]: 调用者列表
     """
-    result = _run_codegraph(['query', '--callers', function_name,
-                             '--path', search_path])
-    if result and 'callers' in result:
-        return result['callers']
+    result = _run_codegraph(['callers', function_name,
+                             '-p', search_path, '-j'])
+    if result:
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict) and 'callers' in result:
+            return result['callers']
 
     # 降级：grep搜索
     return _fallback_callers(function_name, search_path)
@@ -69,17 +72,20 @@ def query_callees(function_name: str, search_path: str) -> list:
     Returns:
         [{name, file, line}]: 被调用者列表
     """
-    result = _run_codegraph(['query', '--callees', function_name,
-                             '--path', search_path])
-    if result and 'callees' in result:
-        return result['callees']
+    result = _run_codegraph(['callees', function_name,
+                             '-p', search_path, '-j'])
+    if result:
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict) and 'callees' in result:
+            return result['callees']
 
     # 降级：函数体搜索
     return _fallback_callees(function_name, search_path)
 
 
 def query_call_graph(function_name: str, search_path: str) -> dict:
-    """查询完整的调用图（同时获取callers和callees）。
+    """查询完整的调用图（分别调用 callers 和 callees 后合并）。
 
     Args:
         function_name: 函数名
@@ -88,14 +94,6 @@ def query_call_graph(function_name: str, search_path: str) -> dict:
     Returns:
         {callers: [...], callees: [...]}
     """
-    result = _run_codegraph(['query', '--call-graph', function_name,
-                             '--path', search_path])
-    if result:
-        return {
-            'callers': result.get('callers', []),
-            'callees': result.get('callees', [])
-        }
-
     return {
         'callers': query_callers(function_name, search_path),
         'callees': query_callees(function_name, search_path)

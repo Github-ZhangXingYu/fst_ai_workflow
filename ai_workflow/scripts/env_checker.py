@@ -74,8 +74,8 @@ RECOMMENDED_TOOLS = {
     'codegraph': {
         'category': 'recommended',
         'check': 'command_exists',
-        'fix_hint': ('请安装 CodeGraph（npm install -g @codegraph-ai/cli 或 '
-                     '从内网已下载的包安装），或设置 CODEGRAPH_CMD 环境变量'),
+        'fix_hint': ('请安装 CodeGraph（npm install -g @colbymchenry/codegraph），'
+                     '或设置 CODEGRAPH_CMD 环境变量指向已安装的 codegraph 二进制'),
         'purpose': 'C++ 调用图分析（影响范围分析）',
         'env_override': 'CODEGRAPH_CMD',
     },

@@ -124,28 +124,63 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_ASSESS
 
 ### 步骤 4: 测试生成
 
-**对于 verdict 不是 reuse 的每个函数，必须用 test-generator Agent 生成测试。**
+**对于 verdict 不是 reuse 的每个函数，按 needed_test_types 逐类型生成测试。**
 
-优先级：**unit > integration > performance**
+从 `ai_workflow/state/test_assessment.json` 中读取每个函数的 `needed_test_types`，对每种类型分别调用 test-generator Agent。
+
+**调 Agent 前先确保目标目录存在：**
+```bash
+mkdir -p tests/{模块名}/unit tests/{模块名}/integration tests/{模块名}/performance
+```
 
 ```
-Agent({
-  subagent_type: "test-generator",
-  description: "为 {函数名} 生成测试",
-  prompt: "为函数 {函数名} 生成测试代码。
-模块路径: service/{模块名}
-需要的测试类型: {needed_test_types}
-函数源码: service/{模块名}/{文件}
+对每个非 reuse 函数:
+  读取 needed_test_types (如 ["unit", "integration", "performance"])
+  对每种类型单独调用 test-generator Agent:
 
-要求: 1) 阅读源码 2) 识别全部分支 3) 生成 GTest/GMock/GBenchmark 代码 4) 遵循命名规范和目录结构 5) 参考 ai_workflow/config/templates/ 模板。"
-})
+  【unit】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成单元测试",
+    prompt: "测试类型: unit
+为函数 {函数名} 生成单元测试。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码 2) 识别全部分支 3) 覆盖正常路径+边界条件+错误路径 4) 输出到 tests/{模块}/unit/ 5) 使用 TEST_F 宏 6) 每个测试用中文注释说明。"
+  })
+
+  【integration】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成集成测试",
+    prompt: "测试类型: integration
+为函数 {函数名} 生成集成测试。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码，识别外部依赖 2) 用 Google Mock (MOCK_METHOD/EXPECT_CALL) 模拟所有外部服务 3) 验证组件间交互顺序 4) 输出到 tests/{模块}/integration/ 5) 使用 TEST_F + MOCK_METHOD。"
+  })
+
+  【performance】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成性能测试",
+    prompt: "测试类型: performance
+为函数 {函数名} 生成性能测试 (Google Benchmark)。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码，识别关键路径 2) 使用 BENCHMARK() 宏 3) 设置合理数据规模 (10^3~10^5) 4) 输出到 tests/{模块}/performance/ 5) 设置 Iterations/ItemsProcessed。"
+  })
 ```
 
 **Agent 调用约束（硬性）：**
 - ❌ 禁止在主对话中直接生成测试代码
-- ✅ 每个函数一个独立 Agent
-- ✅ 函数数 > 5 → 分两批（每批 ≤5 个）
-- ✅ 函数数 > 10 → 先询问主对话确认
+- ✅ 每个函数-类型组合一个独立 Agent（如 8 函数×3 类型 = 最多 24 个 Agent）
+- ✅ 函数数 × 类型数 > 15 → 分两批（每批 ≤15 个）
+- ✅ 函数数 × 类型数 > 30 → 先询问主对话确认
+- ✅ 优先生成单元测试，再集成测试，最后性能测试
 
 ```bash
 python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
@@ -278,7 +313,7 @@ while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
 ### 步骤 9: 生成报告
 
 ```bash
-python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/test_report_$(date +%Y%m%d_%H%M%S).html
+python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/test_report_$(date +%Y%m%d_%H%M%S).md
 python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 ```
 

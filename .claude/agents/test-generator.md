@@ -11,8 +11,29 @@ tools: Read, Write, Edit, Grep, Glob
 你会收到：
 - 一个函数名（如 `TransactionProcessor::processRefund`）
 - 函数的完整源码
-- 该函数需要的测试类型（unit / integration / performance）
+- **测试类型**：`unit` / `integration` / `performance`（每次只生成一种）
 - 函数所在模块的路径
+
+## 按测试类型分发
+
+### 如果是 unit
+- 覆盖：正常路径 + 边界条件（空输入/最大值/最小值/nullptr）+ 错误路径
+- 宏：`TEST_F`
+- 输出文件：`tests/<模块>/unit/test_<函数名>.cpp`
+- 要求：至少 3 个测试用例
+
+### 如果是 integration
+- 使用 Google Mock：`MOCK_METHOD` 定义 mock + `EXPECT_CALL` 设置期望
+- 验证组件间交互顺序和调用次数
+- 输出文件：`tests/<模块>/integration/test_<函数名>_integ.cpp`
+- 要求：先读源码识别所有外部依赖（数据库/RPC/网络），为每个外部依赖创建 Mock 类
+
+### 如果是 performance
+- 使用 Google Benchmark：`BENCHMARK()` 宏
+- 数据规模：10^3~10^5 次迭代
+- 输出文件：`tests/<模块>/performance/bench_<函数名>.cpp`
+- 要求：设置 `state.SetItemsProcessed()` 或 `state.SetBytesProcessed()` 度量吞吐
+- 注意：目标项目的 CMakeLists.txt 需要 `find_package(benchmark REQUIRED)` 才能编译
 
 ## 输出
 
@@ -21,26 +42,7 @@ tools: Read, Write, Edit, Grep, Glob
 - Google Test / Google Mock / Google Benchmark 测试用例
 - 合理的测试数据
 
-## 测试覆盖要求
-
-### 单元测试（unit）
-每个函数至少包含：
-1. **正常路径测试**（happy path）
-2. **边界条件测试**（空输入、最大值、最小值、空字符串、nullptr）
-3. **错误路径测试**（无效参数、异常情况）
-4. **如果有状态**：状态转换测试
-
-### 集成测试（integration）
-1. 使用 Google Mock 模拟所有外部依赖
-2. 验证组件间交互顺序和调用次数
-3. 验证异常传播
-
-### 性能测试（performance）
-1. 使用 Google Benchmark
-2. 设置合理的数据规模（如 10^4 ~ 10^5 次迭代）
-3. 测试关键路径的延迟
-
-## 代码生成规范
+## 代码规范
 
 1. **include 正确**: 参考项目中已有的 include 路径模式
 2. **namespace 正确**: 使用项目中的 namespace 约定
@@ -70,13 +72,14 @@ TEST(TransactionProcessorTest, processRefund_ValidOrder_ReturnsSuccess) {
 
 ## 约束（硬性，不可违反）
 
-1. **一个 Agent = 一个函数**：每次只为一个函数生成测试，禁止在一个 Agent 中处理多个函数
-2. **只生成需要的测试类型**：只做提示中要求的测试类型（unit/integration/performance），不擅自加码
-3. **不确定就查**：如果不确定 include 路径、namespace、接口签名，必须 Read 源码确认
-4. **生成完即止**：生成测试代码后直接返回结果给编排器。不要尝试编译或运行（编排器负责）
-5. **文件放置正确**：
+1. **一个 Agent = 一个函数 + 一种测试类型**：每次只为一个函数的一种测试类型生成代码
+2. **不确定就查**：如果不确定 include 路径、namespace、接口签名，Read 源码确认
+3. **生成完即止**：生成测试代码后直接返回结果给编排器，不要尝试编译或运行
+4. **文件放置正确**：
    - 单元测试 → `tests/<模块>/unit/test_<函数名>.cpp`
    - 集成测试 → `tests/<模块>/integration/test_<函数名>_integ.cpp`
    - 性能测试 → `tests/<模块>/performance/bench_<函数名>.cpp`
-6. **每个测试文件必须有文件头注释**：说明测试目标、覆盖范围、生成时间
-7. **检查已有测试**：写测试前先用 Glob 检查是否已有同名测试文件，避免覆盖
+5. **每个测试文件必须有文件头注释**：说明测试目标、覆盖范围、生成时间
+6. **检查已有测试**：写测试前先 Glob 检查是否已有同名文件，避免覆盖
+7. **目录不存在时先创建**：写测试文件前，确保目标目录存在（用 Bash `mkdir -p tests/<模块>/unit/` 等）
+8. **Mock 优先**：集成测试必须用 MOCK_METHOD + EXPECT_CALL，不能留 TODO 空壳
