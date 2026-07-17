@@ -334,7 +334,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='FST测试运行器：执行Google Test/Benchmark，解析结果'
     )
-    parser.add_argument('--binary', required=True,
+    parser.add_argument('--binary', required=False,
                         help='测试二进制文件路径')
     parser.add_argument('--gtest-filter',
                         help='Google Test过滤器（如 SuiteName.*）')
@@ -362,6 +362,9 @@ def main():
         for b in binaries:
             print(b)
         return
+
+    if not args.binary:
+        parser.error('--binary 是必需的（除非使用 --find-binaries 查找测试二进制）')
 
     if args.benchmark:
         result = run_benchmark_binary(

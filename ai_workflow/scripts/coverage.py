@@ -59,12 +59,16 @@ def _run_lcov_capture(test_binary: str, build_dir: str,
 
     # 3. lcov --capture
     raw_info = os.path.join(work_dir, 'coverage.info')
-    capture_result = subprocess.run(
-        ['lcov', '--capture', '--directory', build_dir,
-         '--output-file', raw_info, '--rc', 'lcov_branch_coverage=1',
-         '--no-external'],
-        capture_output=True, text=True, timeout=120
-    )
+    try:
+        capture_result = subprocess.run(
+            ['lcov', '--capture', '--directory', build_dir,
+             '--output-file', raw_info, '--rc', 'lcov_branch_coverage=1',
+             '--no-external'],
+            capture_output=True, text=True, timeout=120
+        )
+    except FileNotFoundError:
+        # lcov 未安装 → 降级到 gcovr
+        return _fallback_gcovr(build_dir, work_dir, test_result)
 
     if not os.path.exists(raw_info) or os.path.getsize(raw_info) == 0:
         return _fallback_gcovr(build_dir, work_dir, test_result)
@@ -75,23 +79,30 @@ def _run_lcov_capture(test_binary: str, build_dir: str,
     filter_args.extend(exclude_patterns)
     filter_args.extend(['--output-file', filtered_info,
                         '--rc', 'lcov_branch_coverage=1'])
-    subprocess.run(filter_args, capture_output=True, text=True, timeout=60)
+    try:
+        subprocess.run(filter_args, capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        pass  # 过滤失败不致命，用原始数据继续
 
     info_path = filtered_info if os.path.exists(filtered_info) else raw_info
 
     # 5. HTML 报告
     html_dir = os.path.join(work_dir, 'html')
-    gen_result = subprocess.run(
-        ['genhtml', info_path, '--output-directory', html_dir,
-         '--rc', 'lcov_branch_coverage=1', '--title', 'FST 代码覆盖率报告',
-         '--num-spaces', '2', '--legend', '--function-coverage', '--branch-coverage'],
-        capture_output=True, text=True, timeout=120
-    )
+    try:
+        gen_result = subprocess.run(
+            ['genhtml', info_path, '--output-directory', html_dir,
+             '--rc', 'lcov_branch_coverage=1', '--title', 'FST 代码覆盖率报告',
+             '--num-spaces', '2', '--legend', '--function-coverage', '--branch-coverage'],
+            capture_output=True, text=True, timeout=120
+        )
+    except FileNotFoundError:
+        gen_result = None  # genhtml 不可用，跳过 HTML 生成
 
     return {
         'success': capture_result.returncode == 0,
         'info_path': info_path,
-        'html_path': os.path.join(html_dir, 'index.html') if gen_result.returncode == 0 else '',
+        'html_path': os.path.join(html_dir, 'index.html')
+                     if (gen_result and gen_result.returncode == 0) else '',
         'test_exit_code': test_result.returncode
     }
 
