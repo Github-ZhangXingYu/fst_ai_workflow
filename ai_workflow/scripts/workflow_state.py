@@ -21,6 +21,7 @@ STATES = [
     'TEST_GENERATE',
     'COMPILE_FIX_LOOP',
     'TEST_EXECUTE',
+    'TEST_FAILURE_ANALYZE',
     'COVERAGE_ANALYZE',
     'COVERAGE_SUPPLEMENT_LOOP',
     'REPORT',
@@ -228,8 +229,8 @@ class WorkflowState:
         """从暂停状态恢复。"""
         state = self._load()
         if state and state.get('current_stage') == 'PAUSED':
-            state['current_stage'] = state.get('stages', {}).keys()[-1] \
-                if state.get('stages') else 'INIT'
+            stage_keys = list(state.get('stages', {}).keys())
+            state['current_stage'] = stage_keys[-1] if stage_keys else 'INIT'
             state['updated_at'] = datetime.now().isoformat()
             self._save(state)
         return state

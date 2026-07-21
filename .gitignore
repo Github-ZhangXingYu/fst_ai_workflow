@@ -1,6 +1,7 @@
 # FST AI测试工作流 — 忽略运行时状态和报告
 ai_workflow/state/
 ai_workflow/reports/*.html
+ai_workflow/reports/*.md
 
 # Python
 __pycache__/

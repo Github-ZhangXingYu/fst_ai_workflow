@@ -67,7 +67,7 @@
 
   "report": {
     "language": "zh-CN",
-    "format": "html",
+    "format": "markdown",
     "include_screenshots": false,
     "chapters": [
       "summary",

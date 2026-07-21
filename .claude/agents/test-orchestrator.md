@@ -124,28 +124,63 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_ASSESS
 
 ### 步骤 4: 测试生成
 
-**对于 verdict 不是 reuse 的每个函数，必须用 test-generator Agent 生成测试。**
+**对于 verdict 不是 reuse 的每个函数，按 needed_test_types 逐类型生成测试。**
 
-优先级：**unit > integration > performance**
+从 `ai_workflow/state/test_assessment.json` 中读取每个函数的 `needed_test_types`，对每种类型分别调用 test-generator Agent。
+
+**调 Agent 前先确保目标目录存在：**
+```bash
+mkdir -p tests/{模块名}/unit tests/{模块名}/integration tests/{模块名}/performance
+```
 
 ```
-Agent({
-  subagent_type: "test-generator",
-  description: "为 {函数名} 生成测试",
-  prompt: "为函数 {函数名} 生成测试代码。
-模块路径: service/{模块名}
-需要的测试类型: {needed_test_types}
-函数源码: service/{模块名}/{文件}
+对每个非 reuse 函数:
+  读取 needed_test_types (如 ["unit", "integration", "performance"])
+  对每种类型单独调用 test-generator Agent:
 
-要求: 1) 阅读源码 2) 识别全部分支 3) 生成 GTest/GMock/GBenchmark 代码 4) 遵循命名规范和目录结构 5) 参考 ai_workflow/config/templates/ 模板。"
-})
+  【unit】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成单元测试",
+    prompt: "测试类型: unit
+为函数 {函数名} 生成单元测试。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码 2) 识别全部分支 3) 覆盖正常路径+边界条件+错误路径 4) 输出到 tests/{模块}/unit/ 5) 使用 TEST_F 宏 6) 每个测试用中文注释说明。"
+  })
+
+  【integration】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成集成测试",
+    prompt: "测试类型: integration
+为函数 {函数名} 生成集成测试。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码，识别外部依赖 2) 用 Google Mock (MOCK_METHOD/EXPECT_CALL) 模拟所有外部服务 3) 验证组件间交互顺序 4) 输出到 tests/{模块}/integration/ 5) 使用 TEST_F + MOCK_METHOD。"
+  })
+
+  【performance】
+  Agent({
+    subagent_type: "test-generator",
+    description: "为 {函数名} 生成性能测试",
+    prompt: "测试类型: performance
+为函数 {函数名} 生成性能测试 (Google Benchmark)。
+模块: service/{模块名}
+源码: service/{模块名}/{文件}
+
+要求: 1) 阅读源码，识别关键路径 2) 使用 BENCHMARK() 宏 3) 设置合理数据规模 (10^3~10^5) 4) 输出到 tests/{模块}/performance/ 5) 设置 Iterations/ItemsProcessed。"
+  })
 ```
 
 **Agent 调用约束（硬性）：**
 - ❌ 禁止在主对话中直接生成测试代码
-- ✅ 每个函数一个独立 Agent
-- ✅ 函数数 > 5 → 分两批（每批 ≤5 个）
-- ✅ 函数数 > 10 → 先询问主对话确认
+- ✅ 每个函数-类型组合一个独立 Agent（如 8 函数×3 类型 = 最多 24 个 Agent）
+- ✅ 函数数 × 类型数 > 15 → 分两批（每批 ≤15 个）
+- ✅ 函数数 × 类型数 > 30 → 先询问主对话确认
+- ✅ 优先生成单元测试，再集成测试，最后性能测试
 
 ```bash
 python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
@@ -156,6 +191,8 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_GENERATE
 ---
 
 ### 步骤 5: 编译修复循环（最多 3 次）
+
+> `compile_fix_iterations` 同时跟踪编译错误修复和测试逻辑修复，合计 ≤3 次。两种修复共享同一计数器。
 
 **FST 编译惯例**：
 ```
@@ -173,10 +210,14 @@ mkdir -p build && cd build && cmake .. <options> && make -j8 <target>
 | 4 | link_error | "undefined reference", "ld returned" | 检查 CMakeLists.txt 的 target_link_libraries |
 
 ```
-iteration = 0
-while iteration < 3:
-    iteration += 1
+# 从全局状态读取剩余修复次数（编译+测试修复共享，合计 ≤3）
+python ai_workflow/scripts/workflow_state.py --check-compile-fix
+# 返回 {"remaining": N, "current": M, "max": 3}
+
+while remaining > 0:
+    # 每次循环消耗 1 次修复机会
     python ai_workflow/scripts/workflow_state.py --increment-compile-fix
+    remaining -= 1
 
     # 1. 先看 CMakeLists.txt，确定正确的 cmake 选项和 target 名
     # 2. cd build && cmake .. <options> && make -j8 <target>
@@ -189,13 +230,13 @@ while iteration < 3:
         使用 compile-fixer Agent 修复：
         Agent({
           subagent_type: "compile-fixer",
-          description: "修复编译错误 batch {iteration}",
+          description: "修复编译错误 (剩余 {remaining} 次)",
           prompt: "修复以下编译错误（优先级: {P1_desc}）:\n{errors}\n源文件: {test_files}"
         })
         立即重编译
 
-    if iteration == 3 and 仍失败:
-        向主对话报告"编译修复已用满3次，需要人工介入"
+    if remaining == 0 and 仍失败:
+        向主对话报告"编译/测试修复已用满 3 次，需要人工介入"
         展示最后编译错误，询问是否继续
 
 python ai_workflow/scripts/workflow_state.py --transition-to COMPILE_FIX_LOOP
@@ -221,6 +262,62 @@ python ai_workflow/scripts/workflow_state.py --transition-to TEST_EXECUTE
 向主对话报告：通过/失败/跳过数。
 
 **校验：** passed+failed+skipped = total？
+
+---
+
+### 步骤 6.5: 测试失败分析
+
+读取 `ai_workflow/state/test_results.json`：
+
+| 情况 | 处理 |
+|------|------|
+| `failed` == 0 | 跳过此步骤，直接进入步骤 7 |
+
+如果存在失败用例：
+
+1. **对每个失败用例**，调用 test-failure-analyzer Agent：
+   ```
+   Agent({
+     subagent_type: "test-failure-analyzer",
+     description: "分析失败: {test_case_name}",
+     prompt: "分析测试失败根因。
+   测试用例: {test_case_name}
+   失败消息: {failure_message}
+   测试文件: tests/{模块}/{test_file}
+   被测模块: service/{模块名}/
+
+   要求: 1) 读测试源码 2) 读被测 service 源码 3) 判断根因是 test_bug 还是 service_bug 4) 输出结构化分析。"
+   })
+   ```
+   汇总结果，分类为 `test_bugs` 和 `service_bugs`。
+   **优化**：如果某失败用例在上轮已被分析为 service_bug 且 failure_message 未变化，直接复用上次结论，不重复调 Agent。
+
+2. **处理 test_bugs**：
+   ```
+   如果 test_bugs 非空:
+     test-failure-analyzer Agent 已在分析时直接修复了测试文件
+     → 回到步骤 5（步骤 5 统一消耗修复次数，编译+测试修复合计 ≤3 次）
+     如果步骤 5 返回"剩余次数为 0" → 暂停，报告用户
+   ```
+
+3. **处理 service_bugs**：
+   ```
+   如果 service_bugs 非空:
+     汇总所有 service_bug 分析结果
+     生成 ai_workflow/reports/service_bug_report.md:
+       - 元信息（工作流ID、时间、模块）
+       - 每个缺陷: 严重级别、源码位置、失败现象、根因分析、修复建议、CodeGraph影响范围
+     SendMessage 向主对话报告:
+       "发现 {N} 个 service 代码缺陷，已生成报告: ai_workflow/reports/service_bug_report.md
+        另一个编码工作流窗口可读取该报告进行修复，完成后重新触发本测试工作流。"
+     继续步骤 7（覆盖率分析，在最终报告中引用此报告）
+   ```
+
+```bash
+python ai_workflow/scripts/workflow_state.py --transition-to TEST_FAILURE_ANALYZE
+```
+
+**校验：** 每个失败用例都有分析结论？如有 service_bug，service_bug_report.md 是否生成？
 
 ---
 
@@ -278,7 +375,7 @@ while (line_threshold NOT met OR branch_threshold NOT met) AND iteration < 2:
 ### 步骤 9: 生成报告
 
 ```bash
-python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/test_report_$(date +%Y%m%d_%H%M%S).html
+python ai_workflow/scripts/report_generator.py --state-dir ai_workflow/state/ --output ai_workflow/reports/test_report_$(date +%Y%m%d_%H%M%S).md
 python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 ```
 
@@ -290,10 +387,16 @@ python ai_workflow/scripts/workflow_state.py --transition-to REPORT
 
 ```bash
 rm -f ai_workflow/state/trigger.flag
-python ai_workflow/scripts/workflow_state.py --complete --success --summary "工作流完成"
+if [ -f ai_workflow/reports/service_bug_report.md ]; then
+  python ai_workflow/scripts/workflow_state.py --complete --success \
+    --summary "工作流完成，发现 service 代码缺陷，详见 service_bug_report.md"
+else
+  python ai_workflow/scripts/workflow_state.py --complete --success \
+    --summary "工作流完成"
+fi
 ```
 
-向主对话展示最终摘要。
+向主对话展示最终摘要，如有 service_bug_report.md 一并说明。
 
 ---
 

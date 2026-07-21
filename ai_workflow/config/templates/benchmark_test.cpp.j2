@@ -10,6 +10,11 @@
 // 生成时间: {{ generation_time }}
 // 基准测试项: {% for bm in benchmarks %}{{ bm.name }}{% if not loop.last %}, {% endif %}{% endfor %}
 // ============================================================================
+//
+// ⚠️ 使用前请在 CMakeLists.txt 中添加:
+//   find_package(benchmark REQUIRED)
+//   并在测试 target 中 link: target_link_libraries(xxx_benchmark benchmark::benchmark lib)
+// ============================================================================
 
 #include <benchmark/benchmark.h>
 {% for inc in includes %}
