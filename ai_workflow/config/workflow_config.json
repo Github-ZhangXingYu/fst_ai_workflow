@@ -21,11 +21,12 @@
 
   "paths": {
     "service_dir": "service",
-    "test_dir": "test",
-    "build_dir": "build/test",
+    "test_dir": "tests",
+    "build_dir": "build",
+    "product_dir": "product",
+    "test_binary_dir": "product/bin/unittest",
     "state_dir": "ai_workflow/state",
-    "report_dir": "ai_workflow/reports/reports",
-    "audit_dir": "ai_workflow/reports/audit",
+    "report_dir": "ai_workflow/reports",
     "config_dir": "ai_workflow/config",
     "template_dir": "ai_workflow/config/templates"
   },
@@ -64,14 +65,6 @@
     ]
   },
 
-  "audit": {
-    "enabled": true,
-    "format": "jsonl",
-    "rotate_daily": true,
-    "retention_days": 90,
-    "integrity_check": true
-  },
-
   "report": {
     "language": "zh-CN",
     "format": "html",
@@ -84,7 +77,6 @@
       "coverage",
       "traceability",
       "compile_fixes",
-      "audit",
       "gaps"
     ]
   }

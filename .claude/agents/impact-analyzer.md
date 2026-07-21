@@ -24,6 +24,7 @@ grep -rn "functionName(" service/ --include="*.cpp" --include="*.h" | head -50
 
 ### 方法2: #include 依赖分析
 ```bash
+grep -rn "#include" service/<module>/ | grep -v "/tests/"
 grep -rn "#include" service/<module>/ | grep -v "/test/"
 ```
 

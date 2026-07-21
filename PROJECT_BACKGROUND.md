@@ -34,12 +34,12 @@
 - [x] 调研 AI 驱动 C++ 测试工作流的成熟方案
 - [x] 确认技术选型：gcov/lcov/clang-tidy/CodeGraph/Python 3.8+
 - [x] 设计 10 阶段工作流架构
-- [x] 实现 11 个 Python 脚本（env_checker + 10 个工作流脚本）
+- [x] 实现 Python 工作流脚本（9 个：覆盖检测、影响分析、编译、测试、覆盖率、报告生成等）
 - [x] 实现 6 个 Claude Code 子 Agent
 - [x] 实现 `/test-analyze` Skill（手动触发）
 - [x] 配置 Hook（自动检测 C++ 文件变更 + 通知）
 - [x] 3 个 Jinja2 测试模板（单元/集成/性能）
-- [x] 工作流状态机 + JSONL 审计日志 + 中文 HTML 报告
+- [x] 工作流状态机 + 中文 HTML 报告
 - [x] 环境预检脚本（分三级检查 + 缺失提示）
 
 ### 待完成
@@ -59,7 +59,7 @@
    ↓
 编排层: 10 步工作流，Python 脚本 + AI 推理分工
    ↓
-支撑层: state/*.json (步骤间数据), reports/ (审计+报告)
+支撑层: state/*.json (步骤间数据), reports/ (报告)
 ```
 
 ### Python 脚本 vs AI 分工
@@ -81,7 +81,7 @@
 ## 内网部署步骤
 
 1. 将本仓库代码通过 JumpServer 传到内网 Linux
-2. 放到 fst 项目根目录下（与 `service/`、`test/` 同级）
+2. 放到 fst 项目根目录下（与 `service/`、`tests/` 同级）
 3. 确保环境就绪：`python scripts/env_checker.py`
 4. 如缺少工具，根据提示从外网下载 → JumpServer → 内网安装
 5. 运行 `python scripts/env_checker.py --json` 确认全部通过
@@ -94,7 +94,7 @@
 | Python 处理确定性操作 | DeepSeek V4 Flash 能力中等，编译/覆盖率等操作 Python 更可靠 |
 | 单函数处理 | 每次只处理一个函数/一个错误，控制上下文长度 |
 | JSON 文件传递步骤间数据 | 简单、可追溯、可手动检查 |
-| JSONL 审计日志 | 追加写入、防篡改、每日轮转、可用 grep/jq 查询 |
+| JSON 文件传递步骤间数据 | 简单、可追溯、可手动检查 |
 | 代码先在外网写再传内网 | 内网无互联网，无法安装 npm/pip 包 |
 | CodeGraph + grep 降级 | CodeGraph 可能不可用，grep 保证基本可用 |
 | 中文报告 | 团队使用中文 |

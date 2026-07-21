@@ -75,8 +75,8 @@ TEST(TransactionProcessorTest, processRefund_ValidOrder_ReturnsSuccess) {
 3. **不确定就查**：如果不确定 include 路径、namespace、接口签名，必须 Read 源码确认
 4. **生成完即止**：生成测试代码后直接返回结果给编排器。不要尝试编译或运行（编排器负责）
 5. **文件放置正确**：
-   - 单元测试 → `test/<模块>/unit/test_<函数名>.cpp`
-   - 集成测试 → `test/<模块>/integration/test_<函数名>_integ.cpp`
-   - 性能测试 → `test/<模块>/performance/bench_<函数名>.cpp`
+   - 单元测试 → `tests/<模块>/unit/test_<函数名>.cpp`
+   - 集成测试 → `tests/<模块>/integration/test_<函数名>_integ.cpp`
+   - 性能测试 → `tests/<模块>/performance/bench_<函数名>.cpp`
 6. **每个测试文件必须有文件头注释**：说明测试目标、覆盖范围、生成时间
 7. **检查已有测试**：写测试前先用 Glob 检查是否已有同名测试文件，避免覆盖
