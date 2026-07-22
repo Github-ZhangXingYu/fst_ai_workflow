@@ -19,9 +19,7 @@ STATES = [
     'IMPACT_ANALYZE',
     'TEST_ASSESS',
     'TEST_GENERATE',
-    'COMPILE_FIX_LOOP',
-    'TEST_EXECUTE',
-    'TEST_FAILURE_ANALYZE',
+    'TEST_VERIFY_FIX_LOOP',
     'COVERAGE_ANALYZE',
     'COVERAGE_SUPPLEMENT_LOOP',
     'REPORT',
@@ -44,8 +42,8 @@ class WorkflowState:
         state = WorkflowState('ai_workflow/state/')
         state.init('manual', 'zhangsan')
         state.transition('CHANGE_DETECT')
-        if state.can_continue_compile_fix():
-            state.increment_compile_fix()
+        if state.can_continue_test_fix():
+            state.increment_test_fix()
     """
 
     def __init__(self, state_dir: str = 'ai_workflow/state'):
@@ -75,10 +73,16 @@ class WorkflowState:
             'started_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat(),
             'stages': {},
-            'compile_fix_iterations': 0,
+            'test_fix_iterations': 0,
             'coverage_supplement_iterations': 0,
-            'max_compile_fix_iterations': 3,
+            'max_test_fix_iterations': 4,
             'max_coverage_supplement_iterations': 2,
+            'failure_analysis': {
+                'total_failed': 0,
+                'test_bugs_fixed': 0,
+                'test_bugs_unfixed': 0,
+                'service_bugs': 0,
+            },
             'changed_files': changed_files or [],
             'errors': [],
             'completed': False,
@@ -124,8 +128,8 @@ class WorkflowState:
 
     # ---- 循环管理 ----
 
-    def increment_compile_fix(self) -> dict:
-        """编译修复迭代计数+1。
+    def increment_test_fix(self) -> dict:
+        """测试验证修复迭代计数+1（编译错误+test_bug修复共用）。
 
         Returns:
             dict: 更新后的状态
@@ -133,7 +137,7 @@ class WorkflowState:
         state = self._load()
         if not state:
             raise RuntimeError('工作流未初始化。')
-        state['compile_fix_iterations'] = state.get('compile_fix_iterations', 0) + 1
+        state['test_fix_iterations'] = state.get('test_fix_iterations', 0) + 1
         state['updated_at'] = datetime.now().isoformat()
         self._save(state)
         return state
@@ -153,13 +157,13 @@ class WorkflowState:
         self._save(state)
         return state
 
-    def can_continue_compile_fix(self) -> bool:
-        """检查编译修复循环是否可以继续。"""
+    def can_continue_test_fix(self) -> bool:
+        """检查测试验证修复循环是否可以继续。"""
         state = self._load()
         if not state:
             return False
-        current = state.get('compile_fix_iterations', 0)
-        max_iter = state.get('max_compile_fix_iterations', 3)
+        current = state.get('test_fix_iterations', 0)
+        max_iter = state.get('max_test_fix_iterations', 4)
         return current < max_iter
 
     def can_continue_coverage_supplement(self) -> bool:
@@ -171,13 +175,13 @@ class WorkflowState:
         max_iter = state.get('max_coverage_supplement_iterations', 2)
         return current < max_iter
 
-    def get_remaining_compile_fix(self) -> int:
-        """获取编译修复剩余次数。"""
+    def get_remaining_test_fix(self) -> int:
+        """获取测试验证修复剩余次数。"""
         state = self._load()
         if not state:
             return 0
-        return max(0, state.get('max_compile_fix_iterations', 3) -
-                   state.get('compile_fix_iterations', 0))
+        return max(0, state.get('max_test_fix_iterations', 4) -
+                   state.get('test_fix_iterations', 0))
 
     def get_remaining_coverage_supplement(self) -> int:
         """获取覆盖率补充剩余次数。"""
@@ -186,6 +190,40 @@ class WorkflowState:
             return 0
         return max(0, state.get('max_coverage_supplement_iterations', 2) -
                    state.get('coverage_supplement_iterations', 0))
+
+    # ---- 失败分析 ----
+
+    def update_failure_analysis(self, total_failed: int = None,
+                                 test_bugs_fixed: int = None,
+                                 test_bugs_unfixed: int = None,
+                                 service_bugs: int = None) -> dict:
+        """更新失败分析汇总数据。
+
+        Args:
+            total_failed: 失败用例总数
+            test_bugs_fixed: 已修复的 test_bug 数
+            test_bugs_unfixed: 未修复的 test_bug 数
+            service_bugs: service_bug 数量
+
+        Returns:
+            dict: 更新后的状态
+        """
+        state = self._load()
+        if not state:
+            raise RuntimeError('工作流未初始化。')
+        fa = state.get('failure_analysis', {})
+        if total_failed is not None:
+            fa['total_failed'] = total_failed
+        if test_bugs_fixed is not None:
+            fa['test_bugs_fixed'] = test_bugs_fixed
+        if test_bugs_unfixed is not None:
+            fa['test_bugs_unfixed'] = test_bugs_unfixed
+        if service_bugs is not None:
+            fa['service_bugs'] = service_bugs
+        state['failure_analysis'] = fa
+        state['updated_at'] = datetime.now().isoformat()
+        self._save(state)
+        return state
 
     # ---- 错误和完成 ----
 
@@ -213,6 +251,9 @@ class WorkflowState:
 
     def pause(self, reason: str = '') -> dict:
         """暂停工作流（需要用户介入时）。
+
+        注意：service_bug 不作为暂停条件。仅环境缺失、编译死循环、
+        无变更、影响集过大等情况下才暂停。
 
         Args:
             reason: 暂停原因
@@ -347,14 +388,16 @@ def main():
                         help='转移到指定阶段')
     parser.add_argument('--metadata', default='{}',
                         help='阶段元数据（JSON字符串）')
-    parser.add_argument('--check-compile-fix', action='store_true',
-                        help='检查编译修复循环是否可继续（exit 0=可继续, 1=不可）')
+    parser.add_argument('--check-test-fix', action='store_true',
+                        help='检查测试验证修复循环是否可继续（exit 0=可继续, 1=不可）')
     parser.add_argument('--check-coverage-supplement', action='store_true',
                         help='检查覆盖率补充循环是否可继续')
-    parser.add_argument('--increment-compile-fix', action='store_true',
-                        help='编译修复迭代计数+1')
+    parser.add_argument('--increment-test-fix', action='store_true',
+                        help='测试验证修复迭代计数+1')
     parser.add_argument('--increment-coverage-supplement', action='store_true',
                         help='覆盖率补充迭代计数+1')
+    parser.add_argument('--update-failure-analysis',
+                        help='更新失败分析汇总（JSON: {total_failed, test_bugs_fixed, test_bugs_unfixed, service_bugs}）')
     parser.add_argument('--add-error',
                         help='记录错误消息')
     parser.add_argument('--pause',
@@ -394,11 +437,11 @@ def main():
             'stage': args.transition_to
         }, ensure_ascii=False))
 
-    elif args.check_compile_fix:
-        can = wf.can_continue_compile_fix()
+    elif args.check_test_fix:
+        can = wf.can_continue_test_fix()
         state = wf.get_state()
-        current = state.get('compile_fix_iterations', 0) if state else 0
-        max_iter = state.get('max_compile_fix_iterations', 3) if state else 3
+        current = state.get('test_fix_iterations', 0) if state else 0
+        max_iter = state.get('max_test_fix_iterations', 4) if state else 4
         print(json.dumps({
             'can_continue': can,
             'current': current,
@@ -420,11 +463,11 @@ def main():
         }, ensure_ascii=False))
         sys.exit(0 if can else 1)
 
-    elif args.increment_compile_fix:
-        state = wf.increment_compile_fix()
+    elif args.increment_test_fix:
+        state = wf.increment_test_fix()
         print(json.dumps({
             'status': 'incremented',
-            'compile_fix_iterations': state['compile_fix_iterations']
+            'test_fix_iterations': state['test_fix_iterations']
         }, ensure_ascii=False))
 
     elif args.increment_coverage_supplement:
@@ -432,6 +475,18 @@ def main():
         print(json.dumps({
             'status': 'incremented',
             'coverage_supplement_iterations': state['coverage_supplement_iterations']
+        }, ensure_ascii=False))
+
+    elif args.update_failure_analysis:
+        try:
+            fa = json.loads(args.update_failure_analysis)
+        except json.JSONDecodeError:
+            print(json.dumps({'status': 'error', 'message': '无效的 JSON'}, ensure_ascii=False))
+            sys.exit(1)
+        state = wf.update_failure_analysis(**fa)
+        print(json.dumps({
+            'status': 'updated',
+            'failure_analysis': state.get('failure_analysis', {})
         }, ensure_ascii=False))
 
     elif args.add_error:

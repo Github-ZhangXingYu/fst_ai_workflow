@@ -66,12 +66,15 @@ fst/                              # 项目根目录（也是 git 仓库根目录
 ### 工作流阶段
 ```
 INIT → CHANGE_DETECT → IMPACT_ANALYZE → TEST_ASSESS → TEST_GENERATE
-  → COMPILE_FIX_LOOP (≤3次) → TEST_EXECUTE → TEST_FAILURE_ANALYZE
+  → TEST_VERIFY_FIX_LOOP (≤4次，统一处理编译错误+test_bug)
   → COVERAGE_ANALYZE → COVERAGE_SUPPLEMENT_LOOP (≤2次) → REPORT → DONE
 ```
 
+### 核心定义
+本工作流的唯一职责是交付测试报告。测试通过 → "通过"；发现 service 缺陷 → "发现 N 个缺陷"（不修复，由其他流程处理）；测试代码有问题 → 修复后重跑，直到修好或达上限。
+
 ### 循环控制
-- **编译修复循环**: 最多 3 次迭代。第 3 次仍失败则暂停并报告用户
+- **测试验证修复循环**: 最多 4 次迭代。编译错误和 test_bug 修复共享此次数。第 4 次仍失败则记录到报告并继续
 - **覆盖率补充循环**: 最多 2 次迭代。未达标则记录警告并继续
 
 ## 质量规则

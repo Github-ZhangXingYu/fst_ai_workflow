@@ -9,7 +9,7 @@
   },
 
   "limits": {
-    "compile_fix_max_iterations": 3,
+    "test_fix_max_iterations": 4,
     "coverage_supplement_max_iterations": 2,
     "compile_timeout_seconds": 300,
     "test_timeout_seconds": 300,

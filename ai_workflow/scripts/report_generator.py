@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 报告生成器：根据工作流状态数据生成中文 Markdown 测试报告。
-用于 Stage 9：报告生成。
+用于 Stage 8：报告生成。
 """
 import json
 import argparse
@@ -35,6 +35,8 @@ def _load_state_data(state_dir: str) -> dict:
         'test_results': {}, 'coverage_report': {},
         'coverage_files': {}, 'coverage_gaps': [],
         'compile_fixes': [], 'workflow_state': {},
+        'failure_analysis': {},    # 失败分析汇总（来自 workflow_state.json）
+        'failure_details': None,  # 失败分析详细数据（来自 failure_analysis.json）
     }
 
     _load_json(state_path / 'workflow_state.json', data, 'workflow_state')
@@ -43,12 +45,14 @@ def _load_state_data(state_dir: str) -> dict:
     _load_json(state_path / 'test_assessment.json', data, 'assessment')
     _load_json(state_path / 'test_results.json', data, 'test_results')
     _load_json(state_path / 'coverage_report.json', data, 'coverage_report')
+    _load_json(state_path / 'failure_analysis.json', data, 'failure_details')
 
     # 从 workflow_state 提取元数据
     ws = data.get('workflow_state', {})
     data['user'] = ws.get('user', data['user'])
     data['trigger_type'] = ws.get('trigger_type', data['trigger_type'])
     data['workflow_id'] = ws.get('workflow_id', data['workflow_id'])
+    data['failure_analysis'] = ws.get('failure_analysis', {})
 
     # 变更文件
     cf = data.get('changed_files_raw', {})
@@ -67,7 +71,7 @@ def _load_state_data(state_dir: str) -> dict:
     data['tests_failed'] = tr.get('failed', 0)
     data['tests_skipped'] = tr.get('skipped', 0)
 
-    # 覆盖率 — 🔑 兼容嵌套 {"overall": {...}} 和平面 {"line_coverage_pct": ...} 两种格式
+    # 覆盖率 — 兼容嵌套 {"overall": {...}} 和平面 {"line_coverage_pct": ...} 两种格式
     cr = data.get('coverage_report', {})
     if 'overall' in cr:
         overall = cr['overall']
@@ -81,7 +85,7 @@ def _load_state_data(state_dir: str) -> dict:
     data['coverage_gaps'] = cr.get('gaps', [])
 
     # 循环次数
-    data['compile_fix_loops'] = ws.get('compile_fix_iterations', 0)
+    data['test_fix_loops'] = ws.get('test_fix_iterations', 0)
     data['coverage_supplement_loops'] = ws.get('coverage_supplement_iterations', 0)
 
     # 编译修复记录
@@ -104,10 +108,20 @@ def _load_state_data(state_dir: str) -> dict:
 
 def _verdict(data: dict) -> str:
     """计算总体判定文本。"""
-    if data['compile_fix_loops'] >= 3 and data['tests_total'] == 0:
+    if data['test_fix_loops'] >= 4 and data['tests_total'] == 0:
         return '❌ FAIL — 编译失败未解决'
     if data['tests_failed'] > 0:
-        return f'⚠️ WARN — {data["tests_failed"]} 个测试失败'
+        fa = data.get('failure_analysis', {})
+        service_bugs = fa.get('service_bugs', 0)
+        test_bugs_unfixed = fa.get('test_bugs_unfixed', 0)
+        parts = []
+        if service_bugs > 0:
+            parts.append(f'{service_bugs} 个 service 缺陷')
+        if test_bugs_unfixed > 0:
+            parts.append(f'{test_bugs_unfixed} 个 test_bug 未修复')
+        if not parts:
+            parts.append(f'{data["tests_failed"]} 个测试失败')
+        return '⚠️ WARN — ' + '，'.join(parts)
     if not data['line_threshold_met'] or not data['branch_threshold_met']:
         return '⚠️ WARN — 覆盖率未达标'
     if data['tests_total'] == 0:
@@ -122,6 +136,32 @@ def _method_label(method: str) -> str:
         'direct_only': '仅直接变更', 'module_fallback': '模块级别降级',
         'none_detected': '未检测到影响关系',
     }.get(method, method)
+
+
+def _severity_label(severity: str) -> str:
+    """中文化严重级别。"""
+    return {
+        'critical': '🔴 严重',
+        'major': '🟠 重要',
+        'minor': '🟡 轻微',
+    }.get(severity, severity)
+
+
+def _confidence_label(confidence: str) -> str:
+    """中文化置信度。"""
+    return {
+        'high': '高',
+        'medium': '中',
+        'low': '低',
+    }.get(confidence, confidence)
+
+
+def _root_cause_label(root_cause: str) -> str:
+    """中文化根因分类。"""
+    return {
+        'test_bug': '测试代码缺陷',
+        'service_bug': 'Service 代码缺陷',
+    }.get(root_cause, root_cause)
 
 
 def generate_report(state_dir: str, output_path: str) -> str:
@@ -153,6 +193,7 @@ def generate_report(state_dir: str, output_path: str) -> str:
     # === 1. 摘要 ===
     A('## 1. 📊 摘要')
     A('')
+    fa = data.get('failure_analysis', {})
     A(f'| 指标 | 值 | 判定 |')
     A(f'|------|----|------|')
     A(f'| 变更文件数 | {data["changed_files_count"]} | — |')
@@ -162,8 +203,14 @@ def generate_report(state_dir: str, output_path: str) -> str:
     A(f'| 测试失败 | {data["tests_failed"]} | {"❌" if data["tests_failed"] > 0 else "—"} |')
     A(f'| 语句覆盖率 | {lc}% | {lc_ok} (目标 ≥90%) |')
     A(f'| 分支覆盖率 | {bc}% | {bc_ok} (目标 ≥80%) |')
-    A(f'| 编译修复次数 | {data["compile_fix_loops"]} | — |')
+    A(f'| 测试修复次数 | {data["test_fix_loops"]} | — |')
     A(f'| 覆盖率补充次数 | {data["coverage_supplement_loops"]} | — |')
+    if fa.get('test_bugs_fixed', 0) > 0:
+        A(f'| Test Bug 修复 | {fa["test_bugs_fixed"]} 个 | ✅ |')
+    if fa.get('test_bugs_unfixed', 0) > 0:
+        A(f'| Test Bug 未修复 | {fa["test_bugs_unfixed"]} 个 | ❌ |')
+    if fa.get('service_bugs', 0) > 0:
+        A(f'| Service 缺陷 | {fa["service_bugs"]} 个 | 🔴 |')
     A('')
 
     # === 2. 变更影响分析 ===
@@ -230,8 +277,27 @@ def generate_report(state_dir: str, output_path: str) -> str:
     A(f'- ⏱ 总耗时: **{tr.get("total_time_ms", 0)}ms**')
     A('')
 
+    # ---- 失败用例详细分析（含根因结论） ----
+    failure_details = data.get('failure_details')
+    if failure_details:
+        all_cases = failure_details.get('failed_cases', [])
+        if all_cases:
+            A('### 4.1 失败用例分析')
+            A('')
+            A('| 测试用例 | 根因 | 置信度 | 分析结论 |')
+            A('|---------|------|--------|---------|')
+            for case in all_cases:
+                tc = case.get('test_case', '?')
+                rc = _root_cause_label(case.get('root_cause', '?'))
+                conf = _confidence_label(case.get('confidence', 'medium'))
+                analysis = (case.get('analysis', '') or '')[:120]
+                A(f'| `{tc}` | {rc} | {conf} | {analysis} |')
+            A('')
+
     suites = tr.get('suites', [])
     if suites:
+        A('### 4.2 测试套件明细')
+        A('')
         A('| 测试套件 | 测试用例 | 状态 | 耗时 |')
         A('|---------|---------|------|------|')
         for suite in suites:
@@ -244,8 +310,80 @@ def generate_report(state_dir: str, output_path: str) -> str:
                     A(f'| | > 失败: {msg} | | |')
         A('')
 
-    # === 5. 覆盖率详情 ===
-    A('## 5. 📈 覆盖率详情')
+    # === 5. Service 代码缺陷 ===
+    A('## 5. 🔴 Service 代码缺陷')
+    A('')
+    if failure_details:
+        service_bugs = failure_details.get('service_bugs', [])
+        if service_bugs:
+            A(f'测试发现 **{len(service_bugs)}** 个 service 代码缺陷，需由其他修复流程处理：')
+            A('')
+            for i, bug in enumerate(service_bugs, 1):
+                sev = _severity_label(bug.get('severity', 'major'))
+                conf = _confidence_label(bug.get('confidence', 'medium'))
+                A(f'### 5.{i}. {sev} — `{bug.get("test_case", "")}`')
+                A('')
+                A(f'| 属性 | 值 |')
+                A(f'|------|----|')
+                A(f'| 置信度 | {conf} |')
+                A(f'| 被测函数 | `{bug.get("service_function", "?")}` |')
+                A(f'| 源码位置 | `{bug.get("source_location", "?")}` |')
+                A(f'| 失败现象 | {bug.get("analysis", "")} |')
+                if bug.get('fix_suggestion'):
+                    A(f'| 修复建议 | {bug["fix_suggestion"]} |')
+                A('')
+        else:
+            A('✅ 未发现 service 代码缺陷。')
+            A('')
+    else:
+        A('✅ 未发现 service 代码缺陷。')
+        A('')
+
+    # === 6. 测试代码修复记录 ===
+    A('## 6. 🔧 测试代码修复记录')
+    A('')
+    test_bugs_fixed = fa.get('test_bugs_fixed', 0)
+    test_bugs_unfixed = fa.get('test_bugs_unfixed', 0)
+    A(f'- 修复成功: **{test_bugs_fixed}** 个')
+    A(f'- 未修复: **{test_bugs_unfixed}** 个')
+    A(f'- 修复总轮次: **{data["test_fix_loops"]}** / 4')
+    A('')
+
+    # 详细修复记录（来自 failure_analysis.json）
+    if failure_details:
+        test_bugs = failure_details.get('test_bugs', [])
+        if test_bugs:
+            A('| 测试用例 | 状态 | 修复建议 |')
+            A('|---------|------|---------|')
+            for bug in test_bugs:
+                tc = bug.get('test_case', '?')
+                fixed = '✅ 已修复' if bug.get('fixed') else '❌ 未修复'
+                suggestion = (bug.get('fix_suggestion', '') or '')[:100]
+                A(f'| `{tc}` | {fixed} | {suggestion} |')
+            A('')
+
+    fixes = data.get('compile_fixes', [])
+    if fixes:
+        A('### 编译修复记录')
+        A('')
+        for fix in fixes:
+            if isinstance(fix, dict):
+                det = fix.get('details', fix)
+                it = det.get('iteration', fix.get('iteration', '?'))
+                err_count = det.get('error_count', '?')
+                fixed = det.get('fixed', False)
+                status = '✅' if fixed else '❌'
+                summary = str(det.get('error_summary', det.get('summary', '')))[:300]
+                A(f'- **迭代 {it}**: 错误数 {err_count} | {status} {"成功" if fixed else "失败"}')
+                if summary:
+                    A(f'  > {summary}')
+        A('')
+    elif not test_bugs and not fixes:
+        A('✅ 无需修复。')
+        A('')
+
+    # === 7. 覆盖率详情 ===
+    A('## 7. 📈 覆盖率详情')
     A('')
     overall = data.get('coverage_report', {})
     if 'overall' in overall:
@@ -279,8 +417,8 @@ def generate_report(state_dir: str, output_path: str) -> str:
               f'| {fc.get("uncovered_branch_count", 0)} |')
         A('')
 
-    # === 6. 测试用例追溯 ===
-    A('## 6. 🔗 测试用例追溯')
+    # === 8. 测试用例追溯 ===
+    A('## 8. 🔗 测试用例追溯')
     A('')
     if assessment:
         A('| 被测函数 | 测试数量 | 状态 |')
@@ -295,41 +433,34 @@ def generate_report(state_dir: str, output_path: str) -> str:
         A('无可用的追溯数据。')
         A('')
 
-    # === 7. 编译修复记录 ===
-    A('## 7. 🔧 编译修复记录')
-    A('')
-    fixes = data.get('compile_fixes', [])
-    if fixes:
-        for fix in fixes:
-            if isinstance(fix, dict):
-                det = fix.get('details', fix)
-                it = det.get('iteration', fix.get('iteration', '?'))
-                err_count = det.get('error_count', '?')
-                fixed = det.get('fixed', False)
-                status = '✅' if fixed else '❌'
-                summary = str(det.get('error_summary', det.get('summary', '')))[:300]
-                A(f'- **迭代 {it}**: 错误数 {err_count} | {status} {"成功" if fixed else "失败"}')
-                if summary:
-                    A(f'  > {summary}')
-        A('')
-    else:
-        A('✅ 无编译修复记录。')
-        A('')
-
-    # === 8. 未达标项与建议 ===
-    A('## 8. ⚠️ 未达标项与建议')
+    # === 9. 未达标项与建议 ===
+    A('## 9. ⚠️ 未达标项与建议')
     A('')
     items = []
     if not data['line_threshold_met']:
         items.append(f'- ❌ **语句覆盖率未达标**: {lc}% (要求 ≥90%)')
     if not data['branch_threshold_met']:
         items.append(f'- ❌ **分支覆盖率未达标**: {bc}% (要求 ≥80%)')
-    if data['tests_failed'] > 0:
+
+    # Service 缺陷（来自结构化数据）
+    if failure_details:
+        service_bugs = failure_details.get('service_bugs', [])
+        if service_bugs:
+            items.append(f'- 🔴 **{len(service_bugs)} 个 Service 代码缺陷**需要修复（详见第5章）')
+            for bug in service_bugs:
+                items.append(f'  - `{bug.get("service_function", "?")}` ({_severity_label(bug.get("severity", "major"))}): {bug.get("analysis", "")[:100]}')
+
+    # 未修复的 test_bug
+    if failure_details:
+        test_bugs = [b for b in failure_details.get('test_bugs', []) if not b.get('fixed')]
+        if test_bugs:
+            items.append(f'- ⚠️ **{len(test_bugs)} 个 Test Bug 未能自动修复**，需人工介入')
+            for bug in test_bugs:
+                items.append(f'  - `{bug.get("test_case", "?")}`: {bug.get("fix_suggestion", "")[:100]}')
+
+    if data['tests_failed'] > 0 and not failure_details:
         items.append(f'- ❌ **{data["tests_failed"]} 个测试失败**，需要人工检查')
-    # 检查是否有 service bug 报告
-    service_bug_path = Path(state_dir).parent / 'reports' / 'service_bug_report.md'
-    if service_bug_path.exists():
-        items.append(f'- 🔴 **Service 代码缺陷**: 详见 [service_bug_report.md](service_bug_report.md)')
+
     for g in data.get('coverage_gaps', [])[:10]:
         icon = '🔴' if g.get('priority') == 'high' else '🟡'
         items.append(f'- {icon} **{g["type"]}**: `{g["file"]}` '

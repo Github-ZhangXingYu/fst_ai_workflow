@@ -43,7 +43,7 @@ FST 编译惯例：`mkdir -p build && cd build && cmake .. <options> && make -j8
 python ai_workflow/scripts/build_runner.py --build-dir build --target {make目标名} --output ai_workflow/state/compile_result.json
 ```
 
-如果编译失败：分析错误 → 修复 → 重编译。最多 3 次。
+如果编译失败：分析错误 → 修复 → 重编译。最多 4 次。
 
 ### 4. 运行测试
 ```bash
