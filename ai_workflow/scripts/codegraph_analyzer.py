@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 """
-CodeGraph分析器：查询函数的调用者和被调用者，构建影响范围集。
-用于Stage 2：影响分析。
-如果CodeGraph不可用，使用grep作为降级方案。
+CodeGraph 分析器：查询函数的调用者和被调用者，构建影响范围集。
+用于 Stage 2：影响分析。
+
+codegraph 是必须依赖（env_checker 确保可用），不再有 grep 降级路径。
 """
 import subprocess
 import json
 import argparse
 import os
-import re
-from pathlib import Path
 from typing import Optional
 
 
-# CodeGraph CLI命令前缀（可根据实际安装路径修改）
+# CodeGraph CLI 命令前缀（可通过环境变量覆盖）
 CODEGRAPH_CMD = os.environ.get('CODEGRAPH_CMD', 'codegraph')
 
 
 def _run_codegraph(args: list, timeout: int = 30) -> Optional[dict]:
-    """安全地运行CodeGraph命令。
+    """运行 CodeGraph 命令并返回解析后的 JSON。
 
     Args:
         args: 命令参数列表
         timeout: 超时秒数
 
     Returns:
-        dict或None: 解析后的JSON结果，或None（不可用时）
+        dict 或 None：解析后的 JSON 结果
     """
     try:
         result = subprocess.run(
@@ -35,8 +34,12 @@ def _run_codegraph(args: list, timeout: int = 30) -> Optional[dict]:
         if result.returncode == 0 and result.stdout.strip():
             return json.loads(result.stdout)
     except (FileNotFoundError, subprocess.TimeoutExpired,
-            json.JSONDecodeError, OSError):
-        pass
+            json.JSONDecodeError, OSError) as e:
+        raise RuntimeError(
+            f'CodeGraph 调用失败: {e}\n'
+            f'请参考 Confluence 文档获取 CodeGraph 安装包和安装说明，'
+            f'或设置 CODEGRAPH_CMD 环境变量'
+        )
     return None
 
 
@@ -58,8 +61,7 @@ def query_callers(function_name: str, search_path: str) -> list:
         if isinstance(result, dict) and 'callers' in result:
             return result['callers']
 
-    # 降级：grep搜索
-    return _fallback_callers(function_name, search_path)
+    return []
 
 
 def query_callees(function_name: str, search_path: str) -> list:
@@ -80,8 +82,7 @@ def query_callees(function_name: str, search_path: str) -> list:
         if isinstance(result, dict) and 'callees' in result:
             return result['callees']
 
-    # 降级：函数体搜索
-    return _fallback_callees(function_name, search_path)
+    return []
 
 
 def query_call_graph(function_name: str, search_path: str) -> dict:
@@ -100,50 +101,7 @@ def query_call_graph(function_name: str, search_path: str) -> dict:
     }
 
 
-def _fallback_callers(function_name: str, search_path: str) -> list:
-    """grep降级方案：搜索函数调用者。
-
-    在源代码中搜索函数调用模式。
-    """
-    # 提取短函数名（去掉类名前缀）
-    short_name = function_name.split('::')[-1] if '::' in function_name else function_name
-
-    try:
-        result = subprocess.run(
-            ['grep', '-rn', '--include=*.cpp', '--include=*.h', '--include=*.hpp',
-             f'{short_name}\\s*\\(', search_path],
-            capture_output=True, text=True, timeout=30
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    callers = []
-    for line in result.stdout.strip().split('\n'):
-        if not line:
-            continue
-        parts = line.split(':', 2)
-        if len(parts) >= 2:
-            callers.append({
-                'name': f'unknown@{parts[0]}',
-                'file': parts[0],
-                'line': parts[1] if len(parts) > 1 else '?',
-                'source': 'grep_fallback'
-            })
-
-    return callers
-
-
-def _fallback_callees(function_name: str, search_path: str) -> list:
-    """grep降级方案：搜索被调用函数。
-
-    由于grep无法直接识别调用关系，返回空列表。
-    可在后续版本中通过解析函数体来增强。
-    """
-    return []
-
-
-def build_impact_set(changed_functions: list, module_path: str,
-                     fallback_to_module: bool = False) -> dict:
+def build_impact_set(changed_functions: list, module_path: str) -> dict:
     """构建完整的影响范围集。
 
     对每个变更函数：
@@ -154,7 +112,6 @@ def build_impact_set(changed_functions: list, module_path: str,
     Args:
         changed_functions: 变更的函数名列表
         module_path: 模块路径
-        fallback_to_module: 如果所有查询都失败，是否将该模块所有函数作为影响集
 
     Returns:
         {
@@ -162,7 +119,7 @@ def build_impact_set(changed_functions: list, module_path: str,
             callers: [str],
             callees: [str],
             full_impact_set: [str],
-            analysis_method: 'codegraph' | 'grep_fallback' | 'module_fallback',
+            analysis_method: 'codegraph',
             per_function: {function_name: {callers: [...], callees: [...]}}
         }
     """
@@ -170,7 +127,6 @@ def build_impact_set(changed_functions: list, module_path: str,
     all_callers = set()
     all_callees = set()
     per_function = {}
-    codegraph_available = False
 
     for func in changed_functions:
         callers = query_callers(func, module_path)
@@ -180,10 +136,6 @@ def build_impact_set(changed_functions: list, module_path: str,
                         for c in callers]
         callee_names = [c.get('name', f"{c.get('file', '')}:{c.get('line', '')}")
                         for c in callees]
-
-        # 检查CodeGraph是否可用
-        if any(c.get('source') != 'grep_fallback' for c in callers + callees):
-            codegraph_available = True
 
         all_callers.update(caller_names)
         all_callees.update(callee_names)
@@ -198,24 +150,12 @@ def build_impact_set(changed_functions: list, module_path: str,
     # 构建全量影响集（并集，去重）
     full_set = list(set(direct) | all_callers | all_callees)
 
-    # 确定分析方法
-    if direct and not full_set.difference(direct):
-        analysis_method = 'none_detected'
-    elif codegraph_available:
-        analysis_method = 'codegraph'
-    elif all_callers:
-        analysis_method = 'grep_fallback'
-    elif fallback_to_module:
-        analysis_method = 'module_fallback'
-    else:
-        analysis_method = 'direct_only'
-
     return {
         'direct_changes': direct,
         'callers': list(all_callers),
         'callees': list(all_callees),
         'full_impact_set': full_set,
-        'analysis_method': analysis_method,
+        'analysis_method': 'codegraph',
         'per_function': per_function,
         'impact_depth': {
             'direct': len(direct),
@@ -228,7 +168,7 @@ def build_impact_set(changed_functions: list, module_path: str,
 
 def main():
     parser = argparse.ArgumentParser(
-        description='FST CodeGraph分析器：查询调用关系，构建影响范围集'
+        description='FST CodeGraph 分析器：查询调用关系，构建影响范围集'
     )
     parser.add_argument('--function', required=True,
                         help='函数名（如 ClassName::methodName）')
@@ -237,10 +177,10 @@ def main():
     parser.add_argument('--service-dir', default='service',
                         help='服务目录路径')
     parser.add_argument('--output',
-                        help='输出JSON路径（可选）')
+                        help='输出 JSON 路径（可选）')
     parser.add_argument('--mode', choices=['callers', 'callees', 'full'],
                         default='full',
-                        help='查询模式：callers/callees/full（默认full）')
+                        help='查询模式：callers/callees/full（默认 full）')
 
     args = parser.parse_args()
 

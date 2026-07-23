@@ -145,7 +145,7 @@ endif()
 
 **配置在：** 环境变量 `CODEGRAPH_CMD`，默认值 `codegraph`
 
-没有 CodeGraph 工作流会自动降级为 grep 搜索，不影响核心功能。
+CodeGraph 是必须工具，`env_checker.py` 会验证其可用性。
 
 ---
 

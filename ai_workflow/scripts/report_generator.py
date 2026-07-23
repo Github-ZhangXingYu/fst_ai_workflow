@@ -131,11 +131,7 @@ def _verdict(data: dict) -> str:
 
 def _method_label(method: str) -> str:
     """中文化分析方法名。"""
-    return {
-        'codegraph': 'CodeGraph 调用图分析', 'grep_fallback': '文本搜索降级',
-        'direct_only': '仅直接变更', 'module_fallback': '模块级别降级',
-        'none_detected': '未检测到影响关系',
-    }.get(method, method)
+    return 'CodeGraph 调用图分析'
 
 
 def _severity_label(severity: str) -> str:

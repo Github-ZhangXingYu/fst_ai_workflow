@@ -60,9 +60,7 @@ python ai_workflow/scripts/env_checker.py --json --output ai_workflow/state/env_
 
 | 情况 | 响应 |
 |------|------|
-| `can_start` = false | **立即停止**。用 SendMessage 向主对话报告缺失的必须项和修复方法 |
-| `required_failed` 非空 | 向主对话报告必须修复的项，询问是否继续 |
-| `recommended_failed` 非空 | 向主对话提示降级功能，然后继续 |
+| `can_start` = false | **立即停止**。用 SendMessage 向主对话报告缺失项（`failed` 列表）及修复方法 |
 | 全部通过 | 继续 |
 
 初始化工作流：
@@ -110,7 +108,7 @@ python ai_workflow/scripts/codegraph_analyzer.py --function "{函数名}" --modu
 python ai_workflow/scripts/workflow_state.py --transition-to IMPACT_ANALYZE
 ```
 
-**校验：** full_impact_set 非空？analysis_method 字段是否存在（如需，告知主对话降级情况）？
+**校验：** full_impact_set 非空？analysis_method 字段存在？
 **复杂度控制：** full_impact_set > 50 → 提醒主对话数量多；> 100 → 询问是否继续。
 
 ---

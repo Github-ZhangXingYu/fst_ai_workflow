@@ -7,7 +7,7 @@
 ## 目录结构
 
 ```
-反馈/
+ai_workflow/feedback/
 ├── README.md                    # 本文件
 ├── FST-WF-TEST-NNN.md           # 最新一次测试反馈（只有一份，不堆叠）
 └── archive/                     # 所有历史反馈归档
@@ -20,7 +20,7 @@
 
 ## 添加新反馈流程
 
-1. 将 `反馈/` 根目录下当前的 `FST-WF-TEST-*.md` 移入 `archive/`
+1. 将 `ai_workflow/feedback/` 根目录下当前的 `FST-WF-TEST-*.md` 移入 `archive/`
 2. 查看 `archive/` 中最大序号，+1 作为新序号
 3. 按下方模板写入新反馈
 4. 更新本 README 末尾的索引表

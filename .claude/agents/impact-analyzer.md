@@ -1,6 +1,6 @@
 ---
 name: impact-analyzer
-description: CodeGraph影响分析器 — 解读CodeGraph输出，确认变更影响范围
+description: CodeGraph 影响分析器 — 解读 CodeGraph 输出，确认变更影响范围
 tools: Bash, Read, Grep, Glob
 ---
 
@@ -14,22 +14,6 @@ tools: Bash, Read, Grep, Glob
    b. 解读结果，判断哪些调用者确实会被影响
    c. 构建影响传播关系
 3. 汇总所有结果写入 `ai_workflow/state/impact_set.json`
-
-## CodeGraph 不可用时的降级策略
-
-### 方法1: grep 搜索
-```bash
-grep -rn "functionName(" service/ --include="*.cpp" --include="*.h" | head -50
-```
-
-### 方法2: #include 依赖分析
-```bash
-grep -rn "#include" service/<module>/ | grep -v "/tests/"
-grep -rn "#include" service/<module>/ | grep -v "/test/"
-```
-
-### 方法3: 模块级降级
-将整个模块的函数列表作为影响集。
 
 ## 影响确认
 
@@ -55,6 +39,5 @@ grep -rn "#include" service/<module>/ | grep -v "/test/"
 
 1. **最多追踪 2 层调用链**：直接调用者 + 间接调用者即可，不无限递归
 2. **影响 > 20 个函数 → 通知编排器**：分批处理，每批 ≤10 个
-3. **标注分析方法来源**：codegraph / grep / manual，每个调用关系标注 confidence
+3. **标注分析方法来源**：标注 confidence（high/medium/low）
 4. **must_test 判定要具体**：标注为什么需要测试（依赖返回值、参数类型、行为变化等）
-5. **CodeGraph 不可用时用 grep 降级**：不伪造数据，标注 confidence=low

@@ -49,7 +49,6 @@
   "coverage": {
     "enabled": true,
     "tool": "lcov",
-    "fallback": "gcovr",
     "exclude_patterns": [
       "/usr/include/*",
       "/usr/local/include/*",

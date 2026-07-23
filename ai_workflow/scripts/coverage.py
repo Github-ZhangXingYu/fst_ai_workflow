@@ -8,8 +8,6 @@ import json
 import argparse
 import os
 import re
-from pathlib import Path
-from collections import defaultdict
 
 
 # ============================================================
@@ -59,19 +57,20 @@ def _run_lcov_capture(test_binary: str, build_dir: str,
 
     # 3. lcov --capture
     raw_info = os.path.join(work_dir, 'coverage.info')
-    try:
-        capture_result = subprocess.run(
-            ['lcov', '--capture', '--directory', build_dir,
-             '--output-file', raw_info, '--rc', 'lcov_branch_coverage=1',
-             '--no-external'],
-            capture_output=True, text=True, timeout=120
-        )
-    except FileNotFoundError:
-        # lcov 未安装 → 降级到 gcovr
-        return _fallback_gcovr(build_dir, work_dir, test_result)
+    capture_result = subprocess.run(
+        ['lcov', '--capture', '--directory', build_dir,
+         '--output-file', raw_info, '--rc', 'lcov_branch_coverage=1',
+         '--no-external'],
+        capture_output=True, text=True, timeout=120
+    )
 
     if not os.path.exists(raw_info) or os.path.getsize(raw_info) == 0:
-        return _fallback_gcovr(build_dir, work_dir, test_result)
+        return {
+            'success': False,
+            'error': 'lcov 采集失败：生成的 coverage.info 为空',
+            'info_path': '', 'html_path': '',
+            'test_exit_code': test_result.returncode
+        }
 
     # 4. 过滤
     filtered_info = os.path.join(work_dir, 'coverage_filtered.info')
@@ -79,66 +78,28 @@ def _run_lcov_capture(test_binary: str, build_dir: str,
     filter_args.extend(exclude_patterns)
     filter_args.extend(['--output-file', filtered_info,
                         '--rc', 'lcov_branch_coverage=1'])
-    try:
-        subprocess.run(filter_args, capture_output=True, text=True, timeout=60)
-    except FileNotFoundError:
-        pass  # 过滤失败不致命，用原始数据继续
+    subprocess.run(filter_args, capture_output=True, text=True, timeout=60)
 
     info_path = filtered_info if os.path.exists(filtered_info) else raw_info
 
     # 5. HTML 报告
     html_dir = os.path.join(work_dir, 'html')
-    try:
-        gen_result = subprocess.run(
-            ['genhtml', info_path, '--output-directory', html_dir,
-             '--rc', 'lcov_branch_coverage=1', '--title', 'FST 代码覆盖率报告',
-             '--num-spaces', '2', '--legend', '--function-coverage', '--branch-coverage'],
-            capture_output=True, text=True, timeout=120
-        )
-    except FileNotFoundError:
-        gen_result = None  # genhtml 不可用，跳过 HTML 生成
+    gen_result = subprocess.run(
+        ['genhtml', info_path, '--output-directory', html_dir,
+         '--rc', 'lcov_branch_coverage=1', '--title', 'FST 代码覆盖率报告',
+         '--num-spaces', '2', '--legend', '--function-coverage', '--branch-coverage'],
+        capture_output=True, text=True, timeout=120
+    )
 
     return {
         'success': capture_result.returncode == 0,
         'info_path': info_path,
         'html_path': os.path.join(html_dir, 'index.html')
-                     if (gen_result and gen_result.returncode == 0) else '',
+                     if gen_result.returncode == 0 else '',
         'test_exit_code': test_result.returncode
     }
 
 
-def _fallback_gcovr(build_dir: str, work_dir: str, test_result) -> dict:
-    """gcovr 降级方案。"""
-    try:
-        html_dir = os.path.join(work_dir, 'html')
-        os.makedirs(html_dir, exist_ok=True)
-        result = subprocess.run(
-            ['gcovr', '--root', '.', '--html', '--html-details',
-             '-o', os.path.join(html_dir, 'index.html'), '--print-summary'],
-            capture_output=True, text=True, timeout=60
-        )
-        return {
-            'success': result.returncode == 0, 'method': 'gcovr_fallback',
-            'info_path': '', 'html_path': os.path.join(html_dir, 'index.html'),
-            'test_exit_code': test_result.returncode
-        }
-    except FileNotFoundError:
-        return {
-            'success': False, 'error': 'lcov 和 gcovr 均不可用', 'method': 'none',
-            'info_path': '', 'html_path': '', 'test_exit_code': test_result.returncode
-        }
-
-
-def check_tools_available() -> dict:
-    """检查覆盖率工具的可用性。"""
-    tools = {}
-    for tool in ['lcov', 'genhtml', 'gcovr', 'gcov']:
-        result = subprocess.run(
-            ['which', tool] if os.name != 'nt' else ['where', tool],
-            capture_output=True, text=True
-        )
-        tools[tool] = result.returncode == 0
-    return tools
 
 
 # ============================================================
@@ -376,17 +337,10 @@ def main():
                         help='最终 JSON 报告输出路径')
     parser.add_argument('--build-dir', default='build',
                         help='CMake 构建目录（用于 lcov 采集，默认 build/）')
-    parser.add_argument('--check-tools', action='store_true',
-                        help='检查覆盖率工具可用性')
     parser.add_argument('--summary', action='store_true',
                         help='完成后输出文本摘要')
 
     args = parser.parse_args()
-
-    if args.check_tools:
-        tools = check_tools_available()
-        print(json.dumps(tools, indent=2, ensure_ascii=False))
-        return
 
     report = coverage_analyze(
         test_binary=args.binary, source_dir=args.source,
