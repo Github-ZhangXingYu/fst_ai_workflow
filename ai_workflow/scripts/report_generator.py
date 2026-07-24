@@ -6,18 +6,36 @@
 import json
 import argparse
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
 
-def _load_json(filepath: Path, data: dict, key: str):
-    """安全地加载 JSON 文件到 data 字典的指定 key。"""
+def _load_json(filepath: Path, data: dict, key: str) -> bool:
+    """安全地加载 JSON 文件到 data 字典的指定 key。
+
+    Returns:
+        True 加载成功，False 文件不存在或解析失败。
+    """
     if filepath.exists():
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data[key] = json.load(f)
+            return True
         except (json.JSONDecodeError, PermissionError):
             pass
+    return False
+
+
+# 文件 → 报告章节映射（用于缺失告警）
+_FILE_CHAPTER_MAP = {
+    'changed_files_raw': ('第2章 变更影响分析', 'medium'),
+    'impact_set': ('第2章 变更影响分析', 'medium'),
+    'assessment': ('第3章 已有测试评估', 'medium'),
+    'test_results': ('第4章 测试执行结果', 'critical'),
+    'failure_details': ('第5章 Service缺陷 / 第6章 修复记录', 'high'),
+    'coverage_report': ('第7章 覆盖率详情', 'critical'),
+}
 
 
 def _load_state_data(state_dir: str) -> dict:
@@ -37,15 +55,24 @@ def _load_state_data(state_dir: str) -> dict:
         'compile_fixes': [], 'workflow_state': {},
         'failure_analysis': {},    # 失败分析汇总（来自 workflow_state.json）
         'failure_details': None,  # 失败分析详细数据（来自 failure_analysis.json）
+        '_missing_files': [],     # 缺失/加载失败的状态文件列表（用于报告告警）
     }
 
-    _load_json(state_path / 'workflow_state.json', data, 'workflow_state')
-    _load_json(state_path / 'changed_files.json', data, 'changed_files_raw')
-    _load_json(state_path / 'impact_set.json', data, 'impact_set')
-    _load_json(state_path / 'test_assessment.json', data, 'assessment')
-    _load_json(state_path / 'test_results.json', data, 'test_results')
-    _load_json(state_path / 'coverage_report.json', data, 'coverage_report')
-    _load_json(state_path / 'failure_analysis.json', data, 'failure_details')
+    _maybe_collect = []  # (filepath, key)
+
+    _maybe_collect.append((state_path / 'workflow_state.json', 'workflow_state'))
+    _maybe_collect.append((state_path / 'changed_files.json', 'changed_files_raw'))
+    _maybe_collect.append((state_path / 'impact_set.json', 'impact_set'))
+    _maybe_collect.append((state_path / 'test_assessment.json', 'assessment'))
+    _maybe_collect.append((state_path / 'test_results.json', 'test_results'))
+    _maybe_collect.append((state_path / 'coverage_report.json', 'coverage_report'))
+    _maybe_collect.append((state_path / 'failure_analysis.json', 'failure_details'))
+
+    for filepath, key in _maybe_collect:
+        if not _load_json(filepath, data, key):
+            if key in _FILE_CHAPTER_MAP:
+                chapter, severity = _FILE_CHAPTER_MAP[key]
+                data['_missing_files'].append((os.path.basename(str(filepath)), chapter, severity))
 
     # 从 workflow_state 提取元数据
     ws = data.get('workflow_state', {})
@@ -108,6 +135,10 @@ def _load_state_data(state_dir: str) -> dict:
 
 def _verdict(data: dict) -> str:
     """计算总体判定文本。"""
+    # 关键数据缺失 → 报告可信度打折
+    missing_critical = [f for f in data.get('_missing_files', []) if f[2] == 'critical']
+    if missing_critical:
+        return '⚠️ WARN — 关键数据缺失，报告不完整'
     if data['test_fix_loops'] >= 4 and data['tests_total'] == 0:
         return '❌ FAIL — 编译失败未解决'
     if data['tests_failed'] > 0:
@@ -164,6 +195,16 @@ def generate_report(state_dir: str, output_path: str) -> str:
     """生成完整的 Markdown 测试报告。"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     data = _load_state_data(state_dir)
+
+    # 数据完整性告警 → stderr（编排器可见）
+    missing = data.get('_missing_files', [])
+    if missing:
+        sys.stderr.write(
+            '[report_generator] ⚠️ 报告数据不完整 — 以下状态文件缺失：\n'
+        )
+        for filename, chapter, severity in missing:
+            sys.stderr.write(f'  - {filename} → {chapter} [{severity}]\n')
+        sys.stderr.write('\n')
 
     w = []  # lines accumulator
     A = w.append
@@ -433,6 +474,15 @@ def generate_report(state_dir: str, output_path: str) -> str:
     A('## 9. ⚠️ 未达标项与建议')
     A('')
     items = []
+
+    # 数据完整性告警 — 最优先展示
+    missing_files = data.get('_missing_files', [])
+    if missing_files:
+        items.append('- ⚠️ **报告数据不完整** — 以下状态文件缺失，对应章节使用默认值：')
+        for filename, chapter, severity in missing_files:
+            icon = '🔴' if severity == 'critical' else ('🟡' if severity == 'high' else '⚪')
+            items.append(f'  - {icon} `{filename}` → {chapter}')
+
     if not data['line_threshold_met']:
         items.append(f'- ❌ **语句覆盖率未达标**: {lc}% (要求 ≥90%)')
     if not data['branch_threshold_met']:

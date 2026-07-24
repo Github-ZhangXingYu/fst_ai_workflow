@@ -6,6 +6,7 @@
 import json
 import argparse
 import os
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +50,8 @@ class WorkflowState:
     def __init__(self, state_dir: str = 'ai_workflow/state'):
         self.state_dir = Path(state_dir)
         self.state_file = self.state_dir / 'workflow_state.json'
+        # 历史归档目录（state_dir 的父级 → history/）
+        self.history_dir = self.state_dir.parent / 'history'
         os.makedirs(self.state_dir, exist_ok=True)
 
     # ---- 初始化 ----
@@ -56,6 +59,9 @@ class WorkflowState:
     def init(self, trigger_type: str = 'manual', user: str = 'unknown',
              changed_files: list = None) -> dict:
         """初始化新的工作流。
+
+        将上一次运行的所有状态文件归档到 history/<workflow_id>/，
+        然后创建一个干净的 state/ 和新的 workflow_state.json。
 
         Args:
             trigger_type: 'manual' 或 'auto'
@@ -65,6 +71,27 @@ class WorkflowState:
         Returns:
             dict: 初始状态
         """
+        # 将上一次运行的状态文件打包归档到 history/
+        if self.state_dir.exists():
+            # 尝试读取旧 workflow_id 作为归档目录名
+            archive_name = None
+            if self.state_file.exists():
+                try:
+                    with open(self.state_file, 'r', encoding='utf-8') as f:
+                        old = json.load(f)
+                    archive_name = old.get('workflow_id')
+                except (json.JSONDecodeError, PermissionError, OSError):
+                    pass
+            if not archive_name:
+                archive_name = datetime.now().strftime('unknown_%Y%m%d_%H%M%S')
+
+            archive_path = self.history_dir / archive_name
+            # 把 state_dir 整个目录移入 archive_path（目录本身变成 history/<id>/）
+            os.makedirs(self.history_dir, exist_ok=True)
+            shutil.move(str(self.state_dir), str(archive_path))
+            # 重建干净的 state_dir
+            os.makedirs(self.state_dir, exist_ok=True)
+
         state = {
             'workflow_id': datetime.now().strftime('%Y%m%d_%H%M%S'),
             'trigger_type': trigger_type,
